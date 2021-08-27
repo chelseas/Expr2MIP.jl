@@ -39,5 +39,29 @@ function test_unit_step_times_real_var()
     end
 end
 
+function test_max_real()
+    m = Model(default_optimizer)
+    @testset "testing_max_of_reals" begin
+        for i=1:100
+            inputs = @variable(m, [1:10], base_name="inputs")
+            LBs = rand([1:3...], 10) # 10 random ints btw 1 and 3
+            UBs = rand([0:3...], 10) .+ LBs 
+            @assert all(LBs .<= UBs) #assert each pairing of (LB, UB) has LB <= UB
+            y = encode_max_real!(m, inputs, LBs, UBs)
+            # now fix variables and assert that the max is correct
+            max_xᵢ = -Inf
+            for i = 1:10
+                xᵢ = rand()*(UBs[i] - LBs[i]) + LBs[i]
+                @assert LBs[i] <= xᵢ <= UBs[i]
+                max_xᵢ = max(max_xᵢ, xᵢ)
+                @constraint(m, inputs[i] == xᵢ)
+            end
+            optimize!(m)
+            @test value(y) == max_xᵢ
+        end
+    end
+end
+
 test_abs()
 test_unit_step_times_real_var()
+test_max_real()
