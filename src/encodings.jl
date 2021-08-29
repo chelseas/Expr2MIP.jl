@@ -2,6 +2,7 @@ using JuMP
 global MAX_COUNT=0
 global ABS_COUNT=0
 global UNIT_STEP_COUNT=0
+global M = 1000000 # very large number.
 
 function encode_abs!(model, input::VariableRef, LB, UB)
     """
