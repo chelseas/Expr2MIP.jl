@@ -1,6 +1,7 @@
 using JuMP
 global MAX_COUNT=0
 global ABS_COUNT=0
+global UNIT_STEP_COUNT=0
 
 function encode_abs!(model, input::VariableRef, LB, UB)
     """
@@ -8,7 +9,7 @@ function encode_abs!(model, input::VariableRef, LB, UB)
     """
     @assert LB <= UB
     output_var = @variable(model, lower_bound=0.0, base_name="t_$(ABS_COUNT)")
-    δ = @variable(model, binary=true, base_name="δ_$(ABS_COUNT)")
+    δ = @variable(model, binary=true, base_name="δ_abs_$(ABS_COUNT)")
     x⁺= @variable(model, lower_bound=0.0, base_name="x⁺_$(ABS_COUNT)")
     x⁻= @variable(model, lower_bound=0.0, base_name="x⁻_$(ABS_COUNT)")
 
@@ -54,11 +55,20 @@ function encode_max_real!(model, inputs::Array{VariableRef}, LBs::Array, UBs::Ar
         @constraint(model, y >= xᵢ)
     end
     @constraint(model, sum(δeltas) == 1)
+    global MAX_COUNT += 1
     return y::VariableRef
 end
 
 function encode_unit_step!(model, input::VariableRef, LB, UB)
-    # TODO
+    """
+    This function encodes a unit step all by itself. e.g. δ = unit_step(x)
+    """
+    @assert LB <= UB 
+    δ = @variable(model, binary=true, base_name="unit_step_$(UNIT_STEP_COUNT)")
+    global UNIT_STEP_COUNT += 1
+    @constraint(UB*δ >= input)
+    @constraint(input >= LB*(1 - δ))
+    return δ
 end
 
 function encode_unit_step_times_var!(model, ẑ::VariableRef, x::VariableRef, δ::VariableRef, l, u, γ, ζ)
