@@ -66,8 +66,8 @@ function encode_unit_step!(model, input::VariableRef, LB, UB)
     @assert LB <= UB 
     δ = @variable(model, binary=true, base_name="unit_step_$(UNIT_STEP_COUNT)")
     global UNIT_STEP_COUNT += 1
-    @constraint(UB*δ >= input)
-    @constraint(input >= LB*(1 - δ))
+    @constraint(model, UB*δ >= input)
+    @constraint(model, input >= LB*(1 - δ))
     return δ
 end
 

@@ -18,6 +18,20 @@ function test_abs()
     end    
 end
 
+function test_unit_step()
+    m = Model(default_optimizer)
+    @testset "testing_unit_step" begin
+        for i = 1:100
+            input = @variable(m)
+            output = encode_unit_step!(m, input, -5., 5.)
+            const_val = rand()*9 - 4.5 # in range -4.5, 4.5
+            @constraint(m, input == const_val)
+            optimize!(m)
+            @test value(output) == Int(const_val > 0)
+        end
+    end 
+end
+
 function test_unit_step_times_real_var()
     m = Model(default_optimizer)
     @testset "testing_unit_step_times_var" begin
@@ -63,5 +77,6 @@ function test_max_real()
 end
 
 test_abs()
+test_unit_step()
 test_unit_step_times_real_var()
 test_max_real()
