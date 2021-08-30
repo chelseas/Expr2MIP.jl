@@ -1,0 +1,14 @@
+*.aux
+*.fls
+*.log
+*.synctex.gz
+*.fdb_latexmk
+plots/*.pdf
+plots/*.html
+debug_log*
+*.jl.*.cov
+*.jl.cov
+*.jl.mem
+/Manifest.toml
+/docs/build/
+Manifest.toml

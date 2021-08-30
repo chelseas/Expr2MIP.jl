@@ -1,0 +1,4 @@
+[deps]
+GLPK = "60bf3e95-4087-53dc-ae20-288a0d20c6a6"
+Gurobi = "2e9cd046-0924-5485-92f1-d5272153d98b"
+SymEngine = "123dc426-2d89-5057-bbad-38513e3affd8"

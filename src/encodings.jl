@@ -5,7 +5,7 @@ global UNIT_STEP_COUNT=0
 global M = 1000000 # very large number.
 
 # These functions take a JuMP-compatible type, which is either a VariableRef or 
-# GenericAffExpr
+# GenericAffExpr and return a VariableRef corresponding to the output variable
 
 t = Union{VariableRef, GenericAffExpr, AffExpr}
 
