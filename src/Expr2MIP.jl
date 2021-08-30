@@ -10,5 +10,8 @@ export add_constraint!,
        encode_abs!,
        encode_max_real!,
        encode_unit_step!,
-       encode_unit_step_times_var!
+       encode_unit_step_times_var!,
+       elementwise_apply,
+       apply_multivariate,
+       Basic2Expr
 end
