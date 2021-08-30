@@ -1,3 +1,8 @@
+using JuMP
+include("types.jl")
+include("encodings.jl")
+include("utilities.jl")
+
 ############################################################
 #### High Level Functions #####
 ############################################################

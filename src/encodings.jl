@@ -4,7 +4,12 @@ global ABS_COUNT=0
 global UNIT_STEP_COUNT=0
 global M = 1000000 # very large number.
 
-function encode_abs!(model, input::VariableRef, LB, UB)
+# These functions take a JuMP-compatible type, which is either a VariableRef or 
+# GenericAffExpr
+
+t = Union{VariableRef, GenericAffExpr, AffExpr}
+
+function encode_abs!(model, input::t, LB, UB)
     """
     This function encodes absolute value as a mixed-integer program. LB and UB are lower and upper bounds on the input.
     """
@@ -30,7 +35,7 @@ function get_u_max_i(us::Array, i)
     return maximum(us[[1:(i-1)...,(i+1):end...]])
 end
 
-function encode_max_real!(model, inputs::Array{VariableRef}, LBs::Array, UBs::Array)
+function encode_max_real!(model, inputs::Array, LBs::Array, UBs::Array)
     """
     This function encodes the maximum of several real-valued variables. 
         Each input is assumed to have both a lower bound and upper bound, contained respectively in the arrays LBs and UBs
@@ -60,7 +65,7 @@ function encode_max_real!(model, inputs::Array{VariableRef}, LBs::Array, UBs::Ar
     return y::VariableRef
 end
 
-function encode_unit_step!(model, input::VariableRef, LB, UB)
+function encode_unit_step!(model, input::t, LB, UB)
     """
     This function encodes a unit step all by itself. e.g. δ = unit_step(x)
     """
@@ -72,7 +77,7 @@ function encode_unit_step!(model, input::VariableRef, LB, UB)
     return δ
 end
 
-function encode_unit_step_times_var!(model, ẑ::VariableRef, x::VariableRef, δ::VariableRef, l, u, γ, ζ)
+function encode_unit_step_times_var!(model, ẑ::t, x::t, δ::VariableRef, l, u, γ, ζ)
     """
     This function encodes a unitstep*realvar using upper and lower bounds. l,u bound ẑ and γ, ζ bound x.
         l, u, γ, ζ are constants. 
