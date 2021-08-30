@@ -1,4 +1,15 @@
+name = "Expr2MIP"
+uuid = "887c0808-092e-11ec-0748-6b4cb262b8f1"
+authors = ["Chelsea Sidrane <csidrane@stanford.edu>", "Christopher Strong"]
+version = "0.1.0"
+
 [deps]
 GLPK = "60bf3e95-4087-53dc-ae20-288a0d20c6a6"
 Gurobi = "2e9cd046-0924-5485-92f1-d5272153d98b"
 SymEngine = "123dc426-2d89-5057-bbad-38513e3affd8"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
