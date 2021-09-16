@@ -1,4 +1,6 @@
 using JuMP
+import JuMP.MOI.OPTIMAL, JuMP.MOI.INFEASIBLE
+
 include("types.jl")
 include("encodings.jl")
 include("utilities.jl")
@@ -9,7 +11,11 @@ include("utilities.jl")
 
 function add_constraint!(model, c::T where T<:Real, var::Symbol)
     c_jumpified = breakdown_and_encode!(model, c)
-    v = @variable(model, base_name=string(var)) # output variable
+
+    # Find upper and lower bounds then create the variable
+    lower, upper = find_bounds(model, c_jumpified)
+    v = @variable(model, base_name=string(var), lower_bound=lower, upper_bound=upper) # output variable
+    
     con_ref = @constraint(model, v == c_jumpified) # actually add the constraint, at last!
     return con_ref, v
 end
@@ -20,7 +26,8 @@ function add_constraint!(model, c::Expr, var::Symbol)
     c = convert_step_times_var(c)
     c_jumpified = breakdown_and_encode!(model, c)
     # c_jumpified may come back as: v_46 or v_12 - 25 + 14
-    v = @variable(model, base_name=string(var)) # output variable
+    lower, upper = find_bounds(model, c_jumpified)
+    v = @variable(model, base_name=string(var), lower_bound=lower, upper_bound=upper) # output variable
     #println("v = $v")
     #println("typeof(v)= $(typeof(v))")
     con_ref = @constraint(model, v == c_jumpified) # actually add the constraint, at last!
@@ -54,7 +61,6 @@ function breakdown_and_encode!(model, s::Union{Symbol, T where T <: Real})
     return convert_affine_to_jump(s, model)
 end
 
-
 ############################################################
 ###### recursive cases ######
 ############################################################
@@ -70,13 +76,19 @@ function encode!(model, wrapped_f::Sym_f{:abs}, args::Array) # -> JuMP variable 
     @assert length(args) == 1 # scalar function applied to scalar input
     encoded_args = [breakdown_and_encode!(model, a) for a in args]
     input_arg = encoded_args[1]
-    output_var = encode_abs!(model, input_arg, -M, M)
+
+    lower, upper = find_bounds(model, input_arg)
+    output_var = encode_abs!(model, input_arg, lower, upper)
     return output_var
 end
 function encode!(model, wrapped_f::Sym_f{:max}, args::Array)
     encoded_args = [breakdown_and_encode!(model, a) for a in args]
     n_args = length(encoded_args)
-    y = encode_max_real!(model, encoded_args, -M*ones(n_args), M*ones(n_args))
+
+    bounds = [find_bounds(model, encoded_arg) for encoded_arg in encoded_args]
+    lower_bounds = [bound_tuple[1] for bound_tuple in bounds]
+    upper_bounds = [bound_tuple[2] for bound_tuple in bounds]
+    y = encode_max_real!(model, encoded_args, lower_bounds, upper_bounds)
     return y
 end
 function encode!(model, wrapped_f::Sym_f{:min}, args::Array)
@@ -85,7 +97,10 @@ end
 function encode!(model, wrapped_f::Sym_f{:unit_step}, args::Array)
     encoded_args = [breakdown_and_encode!(model, a) for a in args]
     @assert length(encoded_args) == 1
-    δ = encode_unit_step!(model, encoded_args[1], -M, M)
+
+    
+    lower, upper = find_bounds(model, encoded_args[1])
+    δ = encode_unit_step!(model, encoded_args[1], lower, upper)
     return δ 
 end
 function encode!(model, wrapped_f::Sym_f{:unit_step_times_var}, args::Array)
@@ -94,7 +109,11 @@ function encode!(model, wrapped_f::Sym_f{:unit_step_times_var}, args::Array)
     ẑₑ = breakdown_and_encode!(model, ẑ)
     xₑ = breakdown_and_encode!(model, x)
     δ = @variable(model, binary=true, base_name="δ_ustv")
-    z = encode_unit_step_times_var!(model, ẑₑ, xₑ, δ, -M, M, -M, M)
+
+    # TODO: @castrong add computation of lower and upper bounds of both input to the unit step and the real valued variable 
+    lower_ẑₑ, upper_ẑₑ = find_bounds(model, ẑₑ)
+    lower_xₑ, upper_xₑ = find_bounds(model, xₑ)
+    z = encode_unit_step_times_var!(model, ẑₑ, xₑ, δ, lower_ẑₑ, upper_ẑₑ, lower_xₑ, upper_xₑ)
     return z
 end
 # version that logs bounds in a dict?
@@ -156,6 +175,8 @@ function convert_affine_to_jump(s::Symbol, m::Model)
         println("creating new key: $s")
         # fields  are: (has_lb, lb, has_ub, ub, has_fix, fixed_val, has_start, start, is_binary, is_integer)
         info = VariableInfo(false, NaN, false, NaN, false, NaN, false, NaN, false, false)
+
+        # TODO: @castrong add bounds in here 
         JuMP.add_variable(m, JuMP.build_variable(error, info), string(s))
         #return @variable(m, $s) # then m[s] should return the corresponding JuMP variable
     end

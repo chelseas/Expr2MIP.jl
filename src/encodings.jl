@@ -14,10 +14,10 @@ function encode_abs!(model, input::t, LB, UB)
     This function encodes absolute value as a mixed-integer program. LB and UB are lower and upper bounds on the input.
     """
     @assert LB <= UB
-    output_var = @variable(model, lower_bound=0.0, base_name="t_$(ABS_COUNT)")
+    output_var = @variable(model, lower_bound=0.0, upper_bound=max(-LB, UB), base_name="t_$(ABS_COUNT)")
     δ = @variable(model, binary=true, base_name="δ_abs_$(ABS_COUNT)")
-    x⁺= @variable(model, lower_bound=0.0, base_name="x⁺_$(ABS_COUNT)")
-    x⁻= @variable(model, lower_bound=0.0, base_name="x⁻_$(ABS_COUNT)")
+    x⁺= @variable(model, lower_bound=0.0, upper_bound=max(UB, 0.0), base_name="x⁺_$(ABS_COUNT)")
+    x⁻= @variable(model, lower_bound=0.0, upper_bound=max(-LB, 0.0), base_name="x⁻_$(ABS_COUNT)")
 
     @constraint(model, input == x⁺ - x⁻)
     @constraint(model, output_var == x⁺ + x⁻)
@@ -42,6 +42,7 @@ function encode_max_real!(model, inputs::Array, LBs::Array, UBs::Array)
     """
     @assert all(LBs .<= UBs) #assert each pairing of (LB, UB) has LB <= UB
     l_max = maximum(LBs)
+    u_max = maximum(UBs)
     # eliminate any x_i from consideration where u_i <= l_max since we know y >= l_max >= u_i >= x_i
     indices_to_keep = findall(u -> u > l_max, UBs)
     inputs = inputs[indices_to_keep]
@@ -50,7 +51,7 @@ function encode_max_real!(model, inputs::Array, LBs::Array, UBs::Array)
     new_n = length(inputs)
 
     # create output variable
-    y = @variable(model, base_name="y_$(MAX_COUNT)", lower_bound=l_max, upper_bound=maximum(UBs)) # y = max(x_1, x_2, ...)
+    y = @variable(model, base_name="y_$(MAX_COUNT)", lower_bound=l_max, upper_bound=u_max) # y = max(x_1, x_2, ...)
     δeltas = @variable(model, [1:new_n], binary=true, base_name="δ_max_$(MAX_COUNT)")
     for i = 1:new_n
         u_max_i = get_u_max_i(UBs, i)
@@ -86,7 +87,10 @@ function encode_unit_step_times_var!(model, ẑ::t, x::t, δ::VariableRef, l, u,
     @assert JuMP.is_binary(δ)
     @assert l <= u 
     @assert γ <= ζ
-    z = @variable(model, base_name="z") # output    
+    always_off = γ < 0
+    z = @variable(model, base_name="z")                        # output variable 
+                  #lower_bound=max(l, always_off ? 0.0 : -Inf),  # if the step is always off, then the lower bound is 0
+                  #upper_bound=min(u, always_off ? 0.0 : Inf))   # if the step is always off, then the upper bound is 0 
     @constraint(model, ẑ <= u*δ)
     @constraint(model, ẑ >= l*(1-δ))
     @constraint(model, z <= x - γ*(1-δ))

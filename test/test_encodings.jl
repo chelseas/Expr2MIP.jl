@@ -35,7 +35,8 @@ end
 function test_unit_step_times_real_var()
     m = Model(default_optimizer)
     @testset "testing_unit_step_times_var" begin
-        for i = 1:100
+        for i = 1:2  
+            m = Model(default_optimizer)          
             ẑ = @variable(m, base_name="ẑ")
             x = @variable(m, base_name="x")
             δ = @variable(m, base_name="δ", binary=true)
@@ -47,7 +48,12 @@ function test_unit_step_times_real_var()
             const_x = rand()*39 - 5.5 # in range -5.5, 33.5
             @constraint(m, ẑ == const_ẑ)
             @constraint(m, x == const_x)
+            @show num_constraints(m, VariableRef, MOI.GreaterThan{Float64})
+            @show num_constraints(m, VariableRef, MOI.ZeroOne)
+            @show num_constraints(m, AffExpr, MOI.LessThan{Float64})
             optimize!(m)
+            @show termination_status(m)
+
             @test value(z) ≈ (const_ẑ > 0 ? const_x : 0)
         end
     end
