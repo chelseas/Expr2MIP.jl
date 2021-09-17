@@ -33,6 +33,9 @@ using Gurobi
 function test_convert_affine_to_jump()
     m = JuMP.Model(Gurobi.Optimizer)
     e1 = :(3*(x + y) - z)
+    @variable(m, base_name="x", lower_bound=0., upper_bound=1.3)
+    @variable(m, base_name="y", lower_bound=0., upper_bound=1.3)
+    @variable(m, base_name="z", lower_bound=0., upper_bound=1.3)
     jump_e1 = convert_affine_to_jump(e1, m)
     println(jump_e1)
     # @constraint(m, e1 == 4) -> does not  work

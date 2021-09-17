@@ -1,8 +1,10 @@
 using Test 
 using JuMP
-using GLPK
+#using GLPK
+using Gurobi
+ENV["JULIA_DEBUG"] = Main
 
-default_optimizer = GLPK.Optimizer
+default_optimizer = Gurobi.Optimizer #GLPK.Optimizer
 
 function test_abs()
     m = Model(default_optimizer)
@@ -35,7 +37,7 @@ end
 function test_unit_step_times_real_var()
     m = Model(default_optimizer)
     @testset "testing_unit_step_times_var" begin
-        for i = 1:2  
+        for i = 1:100
             m = Model(default_optimizer)          
             ẑ = @variable(m, base_name="ẑ")
             x = @variable(m, base_name="x")
@@ -60,9 +62,9 @@ function test_unit_step_times_real_var()
 end
 
 function test_max_real()
-    m = Model(default_optimizer)
     @testset "testing_max_of_reals" begin
         for i=1:100
+            m = Model(default_optimizer)
             inputs = @variable(m, [1:10], base_name="inputs")
             LBs = rand([1:3...], 10) # 10 random ints btw 1 and 3
             UBs = rand([0:3...], 10) .+ LBs 

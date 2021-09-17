@@ -87,15 +87,20 @@ function encode_unit_step_times_var!(model, ẑ::t, x::t, δ::VariableRef, l, u,
     @assert JuMP.is_binary(δ)
     @assert l <= u 
     @assert γ <= ζ
-    always_off = γ < 0
-    z = @variable(model, base_name="z")                        # output variable 
-                  #lower_bound=max(l, always_off ? 0.0 : -Inf),  # if the step is always off, then the lower bound is 0
-                  #upper_bound=min(u, always_off ? 0.0 : Inf))   # if the step is always off, then the upper bound is 0 
-    @constraint(model, ẑ <= u*δ)
-    @constraint(model, ẑ >= l*(1-δ))
-    @constraint(model, z <= x - γ*(1-δ))
-    @constraint(model, z >= x - ζ*(1-δ))
-    @constraint(model, z >= γ*δ)
-    @constraint(model, z <= ζ*δ)
+    always_off = u < 0
+    if always_off
+        # output variable 
+        @debug "Always off"
+        z = @variable(model, base_name="z", lower_bound=0.0, upper_bound=0.0)            
+    else          
+        # output variable 
+        z = @variable(model, base_name="z", lower_bound=min(0.0, γ), upper_bound=max(0.0, ζ))
+        @constraint(model, ẑ <= u*δ)
+        @constraint(model, ẑ >= l*(1-δ))
+        @constraint(model, z <= x - γ*(1-δ))
+        @constraint(model, z >= x - ζ*(1-δ))
+        @constraint(model, z >= γ*δ)
+        @constraint(model, z <= ζ*δ)
+    end
     return z::VariableRef
 end
