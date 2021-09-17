@@ -72,45 +72,61 @@ test_convert_step_times_var()
 # testing encoding functions
 function testing_encoding()
     @testset "testing encoding" begin
-        m = Model(Gurobi.Optimizer)
-        in_ref = @variable(m, x)
-        con_ref, ovar_ref = add_constraint!(m, :(abs(x)), :o)
-        print(m)
-        optimize!(m)
-        @test value(ovar_ref) >= 0
-        @constraint(m, x == -5)
-        optimize!(m)
-        @test abs(value(x)) == value(ovar_ref)
 
-        m = Model(Gurobi.Optimizer)
-        in_ref = @variable(m, x)
-        con_ref, ovar_ref = add_constraint!(m, :(x + abs(x)), :o)
-        print(m)
-        const_val = rand()*2-1
-        @constraint(m, in_ref == const_val)
-        optimize!(m)
-        @test value(ovar_ref) == const_val + abs(const_val)
+        function f1()
+            m = Model(Gurobi.Optimizer)
+            in_ref = @variable(m, x, lower_bound=0.5, upper_bound=6.7)
+            con_ref, ovar_ref = add_constraint!(m, :(abs(x)), :o)
+            print(m)
+            optimize!(m)
+            @test value(ovar_ref) >= 0
+            @constraint(m, x == -5)
+            optimize!(m)
+            @test abs(value(x)) == value(ovar_ref)
+        end
 
-        m = Model(Gurobi.Optimizer)
-        add_constraint!(m, :(x + 5*abs(x)), :o)
-        print(m)
+        function f2()
+            m = Model(Gurobi.Optimizer)
+            in_ref = @variable(m, x)
+            con_ref, ovar_ref = add_constraint!(m, :(x + abs(x)), :o)
+            print(m)
+            const_val = rand()*2-1
+            @constraint(m, in_ref == const_val)
+            optimize!(m)
+            @test value(ovar_ref) == const_val + abs(const_val)
+        end
 
+        function f3()
+            m = Model(Gurobi.Optimizer)
+            add_constraint!(m, :(x + 5*abs(x)), :o)
+            print(m)
+        end
+
+        function f4()
         m = Model(Gurobi.Optimizer)
         add_constraint!(m, :(5*x + 5*abs(x)), :o)
         print(m)
+        end
 
+        function f5()
         m = Model(Gurobi.Optimizer)
         add_constraint!(m, :(abs(x) + abs(y)), :o)
         print(m)
+        end
 
+        function f6()
         m = Model(Gurobi.Optimizer)
         add_constraint!(m, :(abs(-5 + 10*abs(x))), :o)
         print(m)
+        end
 
+        function f7()
         m = Model(Gurobi.Optimizer)
         add_constraint!(m, :(4*x + 5*y - 62), :o)
         print(m)
+        end
 
+        function f8()
         m = Model(Gurobi.Optimizer)
         ẑ = @variable(m, ẑ)
         con_ref, ovar_ref = add_constraint!(m, :(unit_step(ẑ)), :o)
@@ -119,11 +135,15 @@ function testing_encoding()
         @constraint(m, ẑ == const_ẑ)
         optimize!(m)
         @test value(ovar_ref) == (sign(const_ẑ)+1)/2
+        end
 
+        function f9()
         m = Model(Gurobi.Optimizer)
         add_constraint!(m, :(unit_step(z)*x), :o)
         print(m)
+        end
 
+        function f10()
         m = Model(Gurobi.Optimizer)
         x_ref = @variable(m, x)
         y_ref = @variable(m, y)
@@ -135,7 +155,9 @@ function testing_encoding()
         @constraint(m, y_ref == const_y)
         optimize!(m)
         @test value(ovar_ref) == max(const_x, const_y)
+        end
 
+        function f11()
         m = Model(Gurobi.Optimizer)
         x_ref = @variable(m, x)
         y_ref = @variable(m, y)
@@ -147,6 +169,18 @@ function testing_encoding()
         @constraint(m, y_ref == const_y)
         optimize!(m)
         @test value(ovar_ref) == min(const_x, const_y)
+        end
+        f1()
+        f2()
+        f3()
+        f4()
+        f5()
+        f6()
+        f7()
+        f8()
+        f9()
+        f10()
+        f11()
     end
 end
 testing_encoding()
