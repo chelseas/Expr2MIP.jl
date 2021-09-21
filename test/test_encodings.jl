@@ -81,6 +81,20 @@ function test_max_real()
             optimize!(m)
             @test value(y) == max_xᵢ
         end
+
+        # edge case 
+        m = Model(default_optimizer)
+        x1 = @variable(m, base_name="x1")
+        x2 = @variable(m, base_name="x2")
+        x3 = @variable(m, base_name="x3")
+        LBs = [0.0, -2.999999, -4.]
+        UBs = [-0.0, 1.0, 0.9]
+        y = encode_max_real!(m, [x1, x2, x3], LBs, UBs)
+        @constraint(m, x2 == -1.0)
+        @constraint(m, x3 == -.5)
+        optimize!(m)
+        @test value(y) == 0.0
+
     end
 end
 
