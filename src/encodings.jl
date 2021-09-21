@@ -43,12 +43,16 @@ function encode_max_real!(model, inputs::Array, LBs::Array, UBs::Array)
     @assert all(LBs .<= UBs) #assert each pairing of (LB, UB) has LB <= UB
     l_max = maximum(LBs)
     u_max = maximum(UBs)
-    # eliminate any x_i from consideration where u_i <= l_max since we know y >= l_max >= u_i >= x_i
-    indices_to_keep = findall(u -> u > l_max, UBs)
+    #println("LBs: $LBs, UBs: $UBs, l_max: $l_max")
+    # eliminate any x_i from consideration where u_i < l_max since we know y >= l_max >= u_i >= x_i
+    indices_to_keep = findall(u -> u >= l_max, UBs)
+    #println("indices_to_keep: $indices_to_keep")
     inputs = inputs[indices_to_keep]
     LBs = LBs[indices_to_keep]
     UBs = UBs[indices_to_keep]
     new_n = length(inputs)
+    @assert new_n >= 1
+    #println("new_n = $new_n")
 
     # create output variable
     y = @variable(model, base_name="y_$(MAX_COUNT)", lower_bound=l_max, upper_bound=u_max) # y = max(x_1, x_2, ...)
