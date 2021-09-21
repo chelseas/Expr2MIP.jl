@@ -28,7 +28,22 @@ end
 For a model and objective compute upper and lower bounds on the objective value.
 This will typically consist of relaxing a MIP program to an LP and solving that LP.
 """
+function find_bounds(model, objective::VariableRef, lp_relaxation=true)
+    if has_lower_bound(objective) && has_upper_bound(objective)
+        @debug "looking up bounds for $objective"
+        return lower_bound(objective), upper_bound(objective)
+    else
+        return find_bounds_through_opt(model, objective, lp_relaxation=lp_relaxation)
+    end
+end
+
 function find_bounds(model, objective, lp_relaxation=true)
+    @debug "finding bounds for objective: $objective"
+    return find_bounds_through_opt(model, objective, lp_relaxation=lp_relaxation)
+end
+
+function find_bounds_through_opt(model, objective; lp_relaxation=true)
+    @debug "find bounds through opt for $objective"
     undo_relax = nothing
     if lp_relaxation 
         undo_relax = relax_integrality(model)
@@ -36,7 +51,7 @@ function find_bounds(model, objective, lp_relaxation=true)
 
     @objective(model, Min, objective)
     optimize!(model)
-    @assert termination_status(m) == OPTIMAL string("Termination Status for computing lower bound was ", termination_status(model))
+    @assert termination_status(model) == OPTIMAL string("Termination Status for computing lower bound was ", termination_status(model))
     lower = objective_value(model)
 
     @objective(model, Max, objective)
@@ -51,3 +66,5 @@ function find_bounds(model, objective, lp_relaxation=true)
 
     return lower, upper
 end
+
+unit_step(ẑ) = (sign(ẑ)+1)/2

@@ -10,6 +10,7 @@ include("utilities.jl")
 ############################################################
 
 function add_constraint!(model, c::T where T<:Real, var::Symbol)
+    @debug "adding constraint $c::Real"
     c_jumpified = breakdown_and_encode!(model, c)
 
     # Find upper and lower bounds then create the variable
@@ -21,6 +22,7 @@ function add_constraint!(model, c::T where T<:Real, var::Symbol)
 end
 # the high-level function
 function add_constraint!(model, c::Expr, var::Symbol)
+    @debug "adding constraint $c::Expr"
     # adds constraints to the jump model of the form: var == c
     # where c may be an arbitrary expression like max(10*u, step(z)*u + 6) - 12
     c = convert_step_times_var(c)
@@ -36,17 +38,20 @@ end
 
 # max(x + y + 7z, y + z)
 function breakdown_and_encode!(model, expr::Expr)
+    @debug "breakdown and encode $expr::Expr"
     #containers = (constraints, output_variables, bounds, model)
     #println("expr: $expr")
     f = expr.args[1]
     args = expr.args[2:end]
     # base cases
     if is_affine(expr)
+        @debug "is affine"
         # encode
         jumped_expr = convert_affine_to_jump(expr, model)
         #println("jumped_expr=$(jumped_expr)")
         return jumped_expr
     elseif f ∈ [:abs, :max, :min, :relu, :unit_step, :unit_step_times_var, :+, :-, :*, :/]
+        @debug "encoding PWL or addine function $f"
         out = encode!(model, Sym_f(f), args) # returns jump compatible type
         return out
     else # assuming that this should be passed to OVERT
@@ -58,6 +63,7 @@ function breakdown_and_encode!(model, expr::Expr)
 end
 
 function breakdown_and_encode!(model, s::Union{Symbol, T where T <: Real})
+    @debug "breakdown and encode symbol or number $s"
     return convert_affine_to_jump(s, model)
 end
 
@@ -72,7 +78,7 @@ function encode!(model, wrapped_f::Sym_f{:abs}, args::Array) # -> JuMP variable 
     """
     This function handles recursive parsing and encoding of absolute value. 
     """
-    #println("Encoding abs")
+    @debug "encoding abs of $(args[1])"
     @assert length(args) == 1 # scalar function applied to scalar input
     encoded_args = [breakdown_and_encode!(model, a) for a in args]
     input_arg = encoded_args[1]
@@ -82,6 +88,7 @@ function encode!(model, wrapped_f::Sym_f{:abs}, args::Array) # -> JuMP variable 
     return output_var
 end
 function encode!(model, wrapped_f::Sym_f{:max}, args::Array)
+    @debug "encoding max of $(args)"
     encoded_args = [breakdown_and_encode!(model, a) for a in args]
     n_args = length(encoded_args)
 
@@ -92,9 +99,11 @@ function encode!(model, wrapped_f::Sym_f{:max}, args::Array)
     return y
 end
 function encode!(model, wrapped_f::Sym_f{:min}, args::Array)
+    @debug "encoding min of $(args)"
     return -encode!(model, Sym_f(:max), [:(-$a) for a in args])
 end
 function encode!(model, wrapped_f::Sym_f{:unit_step}, args::Array)
+    @debug "encoding unit step of $(args)"
     encoded_args = [breakdown_and_encode!(model, a) for a in args]
     @assert length(encoded_args) == 1
 
@@ -104,6 +113,7 @@ function encode!(model, wrapped_f::Sym_f{:unit_step}, args::Array)
     return δ 
 end
 function encode!(model, wrapped_f::Sym_f{:unit_step_times_var}, args::Array)
+    @debug "encode unit step times var of $(args)"
     ẑ, x = args
     # z = unit_step(ẑ)*x
     ẑₑ = breakdown_and_encode!(model, ẑ)
@@ -164,7 +174,7 @@ end
 ##### Section: Affine #####
 #############################################################
 function convert_affine_to_jump(s::Symbol, m::Model)
-    #println("s: $s")
+    @debug "converting affine: $s to JuMP"
     if haskey(m, s)
         println("retrieving key: $s using symbol")
         return m[s]
@@ -172,6 +182,7 @@ function convert_affine_to_jump(s::Symbol, m::Model)
         println("retrieving key: $s using string name")
         return JuMP.variable_by_name(m, string(s))
     else
+        @warn "don't think we should be using this case...investigate!"
         println("creating new key: $s")
         # fields  are: (has_lb, lb, has_ub, ub, has_fix, fixed_val, has_start, start, is_binary, is_integer)
         info = VariableInfo(false, NaN, false, NaN, false, NaN, false, NaN, false, false)
@@ -187,6 +198,7 @@ function convert_affine_to_jump(c::T where T <: Real, m::Model)
 end 
 # todo: worry about log(3) coefficients -> JK! JuMP can handle these! :)
 function convert_affine_to_jump(expr::Expr, m::Model)
+    @debug "converting affine expr: $expr to JuMP"
     #println("Expr: $expr")
     f = expr.args[1]
     args = expr.args[2:end]
@@ -291,6 +303,7 @@ end
 function convert_step_times_var(expr::Expr)
     # any place where the expression unit_step(z)*x appears, replace it with: unit_step_times_var(z, x)
     # recursive: if this is a multiplication, check if any of the terms contain step*var
+    @debug "convert step times var"
     f = expr.args[1]
     args = expr.args[2:end]
     if f == :*

@@ -2,7 +2,7 @@ using Test
 using JuMP
 #using GLPK
 using Gurobi
-ENV["JULIA_DEBUG"] = Main
+#ENV["JULIA_DEBUG"] = Main
 
 default_optimizer = Gurobi.Optimizer #GLPK.Optimizer
 
