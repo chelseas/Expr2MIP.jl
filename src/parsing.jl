@@ -174,9 +174,14 @@ end
 #############################################################
 ##### Section: Affine #####
 #############################################################
+special_symbols = Set{Symbol}([:pi])
+
 function convert_affine_to_jump(s::Symbol, m::Model)
-    @debug "converting affine: $s to JuMP"
-    if haskey(m, s)
+    @debug "converting affine symbol: $s to JuMP"
+    if s in special_symbols
+        @debug "processing special symbol $s"
+        return eval(s)
+    elseif haskey(m, s)
         println("retrieving key: $s using symbol")
         return m[s]
     elseif !isnothing(JuMP.variable_by_name(m, string(s)))
