@@ -7,7 +7,7 @@ global M = 1000000 # very large number.
 # These functions take a JuMP-compatible type, which is either a VariableRef or 
 # GenericAffExpr and return a VariableRef corresponding to the output variable
 
-t = Union{VariableRef, GenericAffExpr, AffExpr}
+t = Union{VariableRef, GenericAffExpr, AffExpr, Real}
 
 function encode_abs!(model, input::t, LB, UB)
     """
@@ -54,20 +54,26 @@ function encode_max_real!(model, inputs::Array, LBs::Array, UBs::Array)
     @assert new_n >= 1
     #println("new_n = $new_n")
 
-    # create output variable
-    y = @variable(model, base_name="y_$(MAX_COUNT)", lower_bound=l_max, upper_bound=u_max) # y = max(x_1, x_2, ...)
-    δeltas = @variable(model, [1:new_n], binary=true, base_name="δ_max_$(MAX_COUNT)")
-    for i = 1:new_n
-        u_max_i = get_u_max_i(UBs, i)
-        xᵢ = inputs[i]
-        aᵢ = δeltas[i]
-        lᵢ = LBs[i]
-        @constraint(model, y <= xᵢ + (1 - aᵢ)*(u_max_i - lᵢ))
-        @constraint(model, y >= xᵢ)
+    if new_n == 1
+        # there is no need to actually take a max 
+        y = inputs[1] # should just be 1, the variable that is alwa@debug "there is no need to actually take a max"ys the max
+        @debug "there is no need to actually take a max." y UBs
+    else
+        # create output variable
+        y = @variable(model, base_name="y_$(MAX_COUNT)", lower_bound=l_max, upper_bound=u_max) # y = max(x_1, x_2, ...)
+        δeltas = @variable(model, [1:new_n], binary=true, base_name="δ_max_$(MAX_COUNT)")
+        for i = 1:new_n
+            u_max_i = get_u_max_i(UBs, i)
+            xᵢ = inputs[i]
+            aᵢ = δeltas[i]
+            lᵢ = LBs[i]
+            @constraint(model, y <= xᵢ + (1 - aᵢ)*(u_max_i - lᵢ))
+            @constraint(model, y >= xᵢ)
+        end
+        @constraint(model, sum(δeltas) == 1)
+        global MAX_COUNT += 1
     end
-    @constraint(model, sum(δeltas) == 1)
-    global MAX_COUNT += 1
-    return y::VariableRef
+    return y::t
 end
 
 function encode_unit_step!(model, input::t, LB, UB)

@@ -205,3 +205,10 @@ function testing_encoding()
     end
 end
 testing_encoding()
+
+function test_symbols()
+    m = Model(Gurobi.Optimizer)
+    x_ref = @variable(m, x, lower_bound=-1, upper_bound=1.0)
+    con_ref, ovar_ref = add_constraint!(m, :(pi*(1/180)*x), :o)
+    print(m)
+end

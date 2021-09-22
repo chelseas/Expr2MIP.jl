@@ -11,26 +11,54 @@ ENV["JULIA_DEBUG"] = Main
 ############################################################
 
 function add_constraint!(model, c::T where T<:Real, var::Symbol)
+    """
+    Adds constraints of the form c == var
+    """
     @debug "adding constraint $c::Real"
     c_jumpified = breakdown_and_encode!(model, c)
 
-    # Find upper and lower bounds then create the variable
-    lower, upper = find_bounds(model, c_jumpified)
-    v = @variable(model, base_name=string(var), lower_bound=lower, upper_bound=upper) # output variable
-    
+    if haskey(model, var)
+        @debug "retrieving symbol key $var"
+        v = model[var]
+    elseif !isnothing(JuMP.variable_by_name(model, string(var)))
+        @debug "retrieving string key $var"
+        v = JuMP.variable_by_name(model, string(var))
+    else # variable does not exist yet
+        # Find upper and lower bounds then create the variable
+        @debug "creating new variable"
+        lower, upper = find_bounds(model, c_jumpified)
+        v = @variable(model, base_name=string(var), lower_bound=lower, upper_bound=upper) # output variable
+    end
+
     con_ref = @constraint(model, v == c_jumpified) # actually add the constraint, at last!
     return con_ref, v
 end
 # the high-level function
 function add_constraint!(model, c::Expr, var::Symbol)
+    """
+    Adds constraints of the form c == var
+    """
     @debug "adding constraint $c::Expr"
     # adds constraints to the jump model of the form: var == c
     # where c may be an arbitrary expression like max(10*u, step(z)*u + 6) - 12
     c = convert_step_times_var(c)
     c_jumpified = breakdown_and_encode!(model, c)
     # c_jumpified may come back as: v_46 or v_12 - 25 + 14
-    lower, upper = find_bounds(model, c_jumpified)
-    v = @variable(model, base_name=string(var), lower_bound=lower, upper_bound=upper) # output variable
+    
+    if haskey(model, var)
+        @debug "retrieving symbol key $var"
+        v = model[var]
+    elseif !isnothing(JuMP.variable_by_name(model, string(var)))
+        @debug "retrieving string key $var"
+        v = JuMP.variable_by_name(model, string(var))
+        # TODO: one thing to do that would be interesting would be to run the LP relaxation and see if the bounds are tighter than the OVERT ones...
+    else # variable does not exist yet
+        # Find upper and lower bounds then create the variable
+        @debug "creating new variable"
+        lower, upper = find_bounds(model, c_jumpified)
+        v = @variable(model, base_name=string(var), lower_bound=lower, upper_bound=upper) # output variable
+    end
+
     #println("v = $v")
     #println("typeof(v)= $(typeof(v))")
     con_ref = @constraint(model, v == c_jumpified) # actually add the constraint, at last!
@@ -52,7 +80,7 @@ function breakdown_and_encode!(model, expr::Expr)
         #println("jumped_expr=$(jumped_expr)")
         return jumped_expr
     elseif f ∈ [:abs, :max, :min, :relu, :unit_step, :unit_step_times_var, :+, :-, :*, :/]
-        @debug "encoding PWL or addine function $f"
+        @debug "encoding PWL or affine function $f"
         out = encode!(model, Sym_f(f), args) # returns jump compatible type
         return out
     else # assuming that this should be passed to OVERT
@@ -177,19 +205,20 @@ end
 special_symbols = Set{Symbol}([:pi])
 
 function convert_affine_to_jump(s::Symbol, m::Model)
-    @debug "converting affine symbol: $s to JuMP"
+    @debug("converting affine symbol: $s to JuMP")
     if s in special_symbols
-        @debug "processing special symbol $s"
+        @debug("processing special symbol $s")
         return eval(s)
     elseif haskey(m, s)
-        println("retrieving key: $s using symbol")
+        @debug("retrieving key: $s using symbol")
         return m[s]
     elseif !isnothing(JuMP.variable_by_name(m, string(s)))
-        println("retrieving key: $s using string name")
+        @debug("retrieving key: $s using string name")
         return JuMP.variable_by_name(m, string(s))
     else
         @warn "don't think we should be using this case...investigate!"
-        println("creating new key: $s")
+        @assert 1 == 0
+        @debug("creating new key: $s")
         # fields  are: (has_lb, lb, has_ub, ub, has_fix, fixed_val, has_start, start, is_binary, is_integer)
         info = VariableInfo(false, NaN, false, NaN, false, NaN, false, NaN, false, false)
 

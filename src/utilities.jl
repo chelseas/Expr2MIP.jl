@@ -37,6 +37,14 @@ function find_bounds(model, objective::VariableRef, lp_relaxation=true)
     end
 end
 
+function find_bounds(model, objective::T where T <: Real, lp_relaxation=true)
+    """
+    When you are passed a real value instead of an expression, just return the real value. 
+    """
+    @debug("For constant objective $objective, returning $objective as up and low bound")
+    return objective, objective
+end
+
 function find_bounds(model, objective, lp_relaxation=true)
     @debug "finding bounds for objective: $objective"
     return find_bounds_through_opt(model, objective, lp_relaxation=lp_relaxation)
@@ -56,7 +64,7 @@ function find_bounds_through_opt(model, objective; lp_relaxation=true)
 
     @objective(model, Max, objective)
     optimize!(model)
-    @assert termination_status(m) == OPTIMAL string("Termination Status for computing upper bound was ", termination_status(model))
+    @assert termination_status(model) == OPTIMAL string("Termination Status for computing upper bound was ", termination_status(model))
     upper = objective_value(model)
 
     # If we solved the LP relaxation restore the model's integrality constraints
