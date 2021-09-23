@@ -38,7 +38,7 @@ function add_constraint!(model, c::Expr, var::Symbol)
     """
     Adds constraints of the form c == var
     """
-    @debug "adding constraint $c::Expr"
+    @debug "adding constraint $var == $c::Expr"
     # adds constraints to the jump model of the form: var == c
     # where c may be an arbitrary expression like max(10*u, step(z)*u + 6) - 12
     c = convert_step_times_var(c)
@@ -376,3 +376,15 @@ function convert_step_times_var(expr::Expr)
         return Expr(:call, f, converted_args...)
     end
 end
+
+##################################################################
+### Helper Functions
+##################################################################
+
+function has_key(model::Model, key::Symbol)
+    return haskey(model, key) || !isnothing(JuMP.variable_by_name(model, string(key))) 
+end
+function has_key(model::Model, key::String)
+    return !isnothing(JuMP.variable_by_name(model, key)) 
+end
+
