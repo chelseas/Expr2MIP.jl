@@ -4,7 +4,7 @@ import JuMP.MOI.OPTIMAL, JuMP.MOI.INFEASIBLE
 include("types.jl")
 include("encodings.jl")
 include("utilities.jl")
-ENV["JULIA_DEBUG"] = Main
+ENV["JULIA_DEBUG"] = "" # Main
 
 ############################################################
 #### High Level Functions #####
@@ -54,7 +54,7 @@ function add_constraint!(model, c::Expr, var::Symbol)
         # TODO: one thing to do that would be interesting would be to run the LP relaxation and see if the bounds are tighter than the OVERT ones...
     else # variable does not exist yet
         # Find upper and lower bounds then create the variable
-        @debug "creating new variable"
+        @debug "creating new variable $var"
         lower, upper = find_bounds(model, c_jumpified)
         v = @variable(model, base_name=string(var), lower_bound=lower, upper_bound=upper) # output variable
     end

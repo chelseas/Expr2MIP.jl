@@ -81,7 +81,7 @@ function encode_unit_step!(model, input::t, LB, UB)
     This function encodes a unit step all by itself. e.g. δ = unit_step(x)
     """
     @assert LB <= UB 
-    δ = @variable(model, binary=true, base_name="unit_step_$(UNIT_STEP_COUNT)")
+    δ = @variable(model, binary=true, base_name="unit_step_$(UNIT_STEP_COUNT)", lower_bound=0.0, upper_bound=1.0)
     global UNIT_STEP_COUNT += 1
     @constraint(model, UB*δ >= input)
     @constraint(model, input >= LB*(1 - δ))
