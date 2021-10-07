@@ -4,6 +4,8 @@ using JuMP
 using Gurobi
 #ENV["JULIA_DEBUG"] = Main
 
+include("../src/encodings.jl")
+
 default_optimizer = Gurobi.Optimizer #GLPK.Optimizer
 
 function test_abs()

@@ -152,7 +152,7 @@ function testing_encoding()
             m = Model(Gurobi.Optimizer)
             ẑ = @variable(m, ẑ, lower_bound=-6.7, upper_bound=5.6)
             x = @variable(m, x, lower_bound=-12.3, upper_bound=0.5)
-            con_ref, ovar_ref = add_constraint!(m, :(unit_step(ẑ)*x), :o)
+            con_ref, ovar_ref = add_constraint!(m, :(unit_step(ẑ)*x), :o, bound_type="interval")
             print(m)
             const_ẑ = rand()*12.3 - 6.7
             const_x = rand()*12.8 - 12.3
@@ -166,7 +166,7 @@ function testing_encoding()
             m = Model(Gurobi.Optimizer)
             x_ref = @variable(m, x, lower_bound=-1, upper_bound=1.0)
             y_ref = @variable(m, y, lower_bound=-1., upper_bound=1.0)
-            con_ref, ovar_ref = add_constraint!(m, :(max(x,y)), :o)
+            con_ref, ovar_ref = add_constraint!(m, :(max(x,y)), :o, bound_type="opt")
             print(m)
             const_x = rand()*2 - 1
             const_y = rand()*2 - 1
