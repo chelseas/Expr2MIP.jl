@@ -13,5 +13,6 @@ export add_constraint!,
        encode_unit_step_times_var!,
        elementwise_apply,
        apply_multivariate,
-       Basic2Expr
+       Basic2Expr,
+       find_bounds
 end
