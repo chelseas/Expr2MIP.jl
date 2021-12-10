@@ -86,7 +86,7 @@ function breakdown_and_encode!(model, expr::Expr; bound_type="interval")
     else # assuming that this should be passed to OVERT
         println("calling OVERT for expr $expr")
         # smooth nonlinearity
-        out = call_overt(model, f, args)
+        out = call_overt!(model, f, args)
         return out
     end
 end
@@ -180,7 +180,7 @@ function encode!(model, wrapped_f::Sym_f{:*}, args::Array; bound_type = "interva
     if sum(isnn) > 1 # multiplication of two real valued variables is present
         # todo: check we don't have e.g. relu*relu or abs*abs...because I still have to add support to overt for relu*relu
         # also check for unit_step*unit_step and steptimesvar*steptimesvar
-        var = call_overt(model, :*, args[isnn]) # encodes this arg(s) that contain variables. returns jump var
+        var = call_overt!(model, :*, args[isnn]) # encodes this arg(s) that contain variables. returns jump var
         return *(var, args[.!isnn]...) # multiply variable and coefficient together
     else # "outer affine" e.g. const*relu
         encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type) for a in args[isnn]]
@@ -190,7 +190,7 @@ end
 function encode!(model, wrapped_f::Sym_f{:/}, args::Array; bound_type = "interval")
     @assert length(args) == 2
     if !is_number(args[2]) # call overt to handle c/x or c/(x+y) type stuff
-        var = call_overt(model, :/, args)
+        var = call_overt!(model, :/, args)
         return var
     else  # looks something like: relu(x) / c, perhaps. "outer affine"
         # is_number(args[2]) # second arg is number
