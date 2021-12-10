@@ -3,6 +3,7 @@ global MAX_COUNT=0
 global ABS_COUNT=0
 global UNIT_STEP_COUNT=0
 global M = 1000000 # very large number.
+global NEW_OVERT_VAR_COUNT=0
 
 # These functions take a JuMP-compatible type, which is either a VariableRef or 
 # GenericAffExpr and return a VariableRef corresponding to the output variable

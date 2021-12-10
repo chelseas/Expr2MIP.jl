@@ -308,15 +308,61 @@ end
 ############################################################
 #####  overt interface ######
 ############################################################
-function call_overt(model, f, args)
-    # todo: turn from sketch -> real code
-    expr = Expr(:call, f, args...)
+function define_state_variables!(model, domain)
+    for (state,bounds) in domain 
+        if !has_key(model, state)
+            @variable(model, base_name=string(state), lower_bound=bounds[1], upper_bound=bounds[2])
+        else
+            println("skipping. don't want to redefine $state ∈ $bounds")
+        end
+    end
+    return nothing # purely a side effect function
+end
+
+function encode_overapprox!(model::Model, oa::OverApproximation, domain; bound_type="opt")
+    # From the overapproximation object we want to encode the approx_eq and the approx_ineq
+    # we need all variables to be defined before they are encoded bc we expect ranges
+    println("Encoding the overapproximation using $bound_type bounding.")
+    define_state_variables!(model, domain)
+    # approx_eq
+    for c in oa.approx_eq
+        # constraints are of the form: v_1 == 5*v_6 - 12*v_9 - 7
+        LHS = c.args[2] # just a symbol
+        @assert typeof(LHS) == Symbol 
+        RHS = c.args[3] # an expr
+        con_ref, output_ref = add_constraint!(model, RHS, LHS, bound_type=bound_type)
+    end
+    # approx_ineq
+    for c in oa.approx_ineq
+        # these constraints are of the form: v_1 <= v_3
+        @assert typeof(c.args[2]) == Symbol 
+        @assert typeof(c.args[3]) == Symbol
+        LHS = JuMP.variable_by_name(model, string(c.args[2]))
+        RHS = JuMP.variable_by_name(model, string(c.args[3]))
+        @constraint(model, LHS <= RHS)
+    end
+    # TODO: use both here and in fuel gage. (don't forget to push to cloud and then pull on jodhpur)
+end
+
+function call_overt!(model, f, args; bound_type="opt")
+    # encode args 
+    encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type) for a in args]
+    # replace args with new variables
+    new_args = [Symbol("nov_$(NEW_OVERT_VAR_COUNT + i)") for i = 1:length(args)]
+    NEW_OVERT_VAR_COUNT += length(args) 
+    expr = Expr(:call, f, new_args...)
+    # find ranges for new args 
+    bounds = [find_bounds(model, encoded_arg, bound_type=bound_type) for encoded_arg in encoded_args]
+    # define new args in model 
+    new_arg_refs = [@variable(model, base_name=string(new_args[i]), lower_bound=bounds[i][1], upper_bound=bounds[i][2]) for i in 1:length(args)]
+    # construct range_dict
+    range_dict = Dict(zip(new_args, bounds)) 
+    # overapproximate
     oa = overapprox_nd(expr, range_dict::Dict{Symbol, Array{T, 1}} where {T <: Real}, N=-1)
     # deal with overt
-    for constraint in oa.approx_eq #, oa.approx_ineq
-        add_constraint!(model, constraint, :c)
-    end
-    return oa.output
+    encode_overapprox!(model, oa, oa.ranges)
+    @assert has_key(model, string(oa.output))
+    return oa.output # which should already be in the model
 end
 
 ############################################################

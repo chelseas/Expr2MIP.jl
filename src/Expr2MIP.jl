@@ -14,5 +14,6 @@ export add_constraint!,
        elementwise_apply,
        apply_multivariate,
        Basic2Expr,
-       find_bounds
+       find_bounds,
+       encode_overapprox!
 end
