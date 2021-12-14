@@ -1,5 +1,6 @@
 using JuMP
 import JuMP.MOI.OPTIMAL, JuMP.MOI.INFEASIBLE
+using OVERT
 
 include("types.jl")
 include("encodings.jl")
@@ -349,16 +350,16 @@ function call_overt!(model, f, args; bound_type="opt")
     encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type) for a in args]
     # replace args with new variables
     new_args = [Symbol("nov_$(NEW_OVERT_VAR_COUNT + i)") for i = 1:length(args)]
-    NEW_OVERT_VAR_COUNT += length(args) 
+    global NEW_OVERT_VAR_COUNT += length(args) 
     expr = Expr(:call, f, new_args...)
     # find ranges for new args 
-    bounds = [find_bounds(model, encoded_arg, bound_type=bound_type) for encoded_arg in encoded_args]
+    bounds = [[find_bounds(model, encoded_arg, bound_type=bound_type)...] for encoded_arg in encoded_args]
     # define new args in model 
     new_arg_refs = [@variable(model, base_name=string(new_args[i]), lower_bound=bounds[i][1], upper_bound=bounds[i][2]) for i in 1:length(args)]
     # construct range_dict
     range_dict = Dict(zip(new_args, bounds)) 
     # overapproximate
-    oa = overapprox_nd(expr, range_dict::Dict{Symbol, Array{T, 1}} where {T <: Real}, N=-1)
+    oa = overapprox(expr, range_dict::Dict{Symbol, Array{T, 1}} where {T <: Real}, N=-1)
     # deal with overt
     encode_overapprox!(model, oa, oa.ranges)
     @assert has_key(model, string(oa.output))

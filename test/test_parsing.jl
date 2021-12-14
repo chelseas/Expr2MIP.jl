@@ -1,5 +1,6 @@
 # testing
 include("../src/parsing.jl")
+include("../src/encodings.jl")
 using Test
 # ENV["JULIA_DEBUG"] = Main
 
@@ -211,4 +212,13 @@ function test_symbols()
     x_ref = @variable(m, x, lower_bound=-1, upper_bound=1.0)
     con_ref, ovar_ref = add_constraint!(m, :(pi*(1/180)*x), :o)
     print(m)
+end
+
+function test_overt()
+    m = Model(with_optimizer(Gurobi.Optimizer, OutputFlag=0))
+    x_ref = @variable(m, x, lower_bound=-1, upper_bound=1.0)
+    e = :(sin(x) + x)
+    con_ref, ovar_ref = add_constraint!(m, e, :o)
+    # TODO: step through this call (add_constraint) instead of just calling the high level thing
+    # then fix the value of x, max and min oa.output and assert that this is an interval capturing the true value?
 end

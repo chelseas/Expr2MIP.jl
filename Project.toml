@@ -9,6 +9,7 @@ Gurobi = "2e9cd046-0924-5485-92f1-d5272153d98b"
 IntervalArithmetic = "d1acc4aa-44c8-5952-acd4-ba5d80a2a253"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 LazySets = "b4f0291d-fe17-52bc-9479-3d1a343d9043"
+OVERT = "07e67fc4-eb77-11eb-38c2-1307cbb1fbf4"
 SymEngine = "123dc426-2d89-5057-bbad-38513e3affd8"
 
 [extras]
