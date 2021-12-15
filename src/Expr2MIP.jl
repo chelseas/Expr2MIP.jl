@@ -15,5 +15,6 @@ export add_constraint!,
        apply_multivariate,
        Basic2Expr,
        find_bounds,
-       encode_overapprox!
+       encode_overapprox!,
+       define_state_variables!
 end

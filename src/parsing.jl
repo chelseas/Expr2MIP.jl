@@ -314,7 +314,7 @@ function define_state_variables!(model, domain)
         if !has_key(model, state)
             @variable(model, base_name=string(state), lower_bound=bounds[1], upper_bound=bounds[2])
         else
-            println("skipping. don't want to redefine $state ∈ $bounds")
+            @debug("skipping. don't want to redefine $state ∈ $bounds")
         end
     end
     return nothing # purely a side effect function
