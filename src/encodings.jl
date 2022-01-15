@@ -137,7 +137,7 @@ function encode_relu!(model, ẑ::t, lower, upper; relax="triangle")
     """
     # thoughts: could I call a zonotope method here?
     # start by adding some cases for different kinds of encoding. exact and different relaxations.  
-    println("Encoding relu using $(relax) relaxation.")
+    println("Encoding relu using $(relax) relaxation. lower bound: $lower, upper bound $upper")
     if relax == "none"
         z = @variable(model, base_name="z_relu_$(RELU_COUNT)", lower_bound=max(0.0, lower), upper_bound=max(0.0, upper))
         δ = @variable(model, base_name="δ_relu_$(RELU_COUNT)", binary=true)
