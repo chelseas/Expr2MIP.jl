@@ -222,3 +222,12 @@ function test_overt()
     # TODO: step through this call (add_constraint) instead of just calling the high level thing
     # then fix the value of x, max and min oa.output and assert that this is an interval capturing the true value?
 end
+
+function test_max_rewrite()
+    # test the re-write of max to relu
+    # max(a,b) = 0.5*(a + b + relu(a-b) + relu(b-a))
+    relu(x) = max(x, 0)
+    x = rand()
+    y = rand()
+    @assert max(x,y) == 0.5*(x + y + relu(x - y) + relu(y - x))
+end

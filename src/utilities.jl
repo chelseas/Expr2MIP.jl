@@ -63,7 +63,6 @@ end
 
 function find_bounds_through_int_arithmetic(model, objective)
     # use interval arithmetic to get bounds on objective
-    @debug "Finding bounds through interval arithmetic for object $objective"
     # turn all variables in expression into intervals (using bounds)
     expr = objective
     int_expr = expr.constant # interval 
@@ -79,13 +78,14 @@ function find_bounds_through_int_arithmetic(model, objective)
     #t1 = @elapsed println("int_expr = $int_expr")
     #t2 = @elapsed println("lazy_int_expr = $int_expr_lazy")
     #println("lazy took $t2 to evaluate vs. $t1 for concrete")
+    @debug "Found bounds [$(int_expr.lo),$(int_expr.hi)] through interval arithmetic for object $objective"
     return int_expr.lo, int_expr.hi
 end
 
 function find_bounds_through_opt(model, objective; lp_relaxation=true)
-    @debug "find bounds through opt for $objective"
     undo_relax = nothing
-    if lp_relaxation 
+    if lp_relaxation
+        println("relaxing LP...") 
         undo_relax = relax_integrality(model)
     end
 
@@ -103,6 +103,8 @@ function find_bounds_through_opt(model, objective; lp_relaxation=true)
     if undo_relax !== nothing
         undo_relax()
     end
+
+    println("found bounds [$(lower), $(upper)] through opt for $objective")
 
     return lower, upper
 end

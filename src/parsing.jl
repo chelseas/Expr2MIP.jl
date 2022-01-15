@@ -117,8 +117,15 @@ function encode!(model, wrapped_f::Sym_f{:abs}, args::Array; bound_type="interva
     output_var = encode_abs!(model, input_arg, lower, upper)
     return output_var
 end
-function encode!(model, wrapped_f::Sym_f{:max}, args::Array; bound_type="interval")
-    @debug "encoding max of $(args)"
+function encode!(model, wrapped_f::Sym_f{:max}, args::Array; bound_type="interval", relu_rewrite=true)
+    if !relu_rewrite 
+        return encode_max_direct!(model, args::Array; bound_type=bound_type)
+    else # relu_rewrite == true
+        return encode_max_relu_rewrite!(model, args::Array; bound_type=bound_type)
+    end
+end
+function encode_max_direct!(model, args::Array; bound_type="interval")
+    @debug "encoding max of $(args) EXACTLY"
     encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type) for a in args]
     n_args = length(encoded_args)
 
@@ -126,6 +133,40 @@ function encode!(model, wrapped_f::Sym_f{:max}, args::Array; bound_type="interva
     lower_bounds = [bound_tuple[1] for bound_tuple in bounds]
     upper_bounds = [bound_tuple[2] for bound_tuple in bounds]
     y = encode_max_real!(model, encoded_args, lower_bounds, upper_bounds)
+    return y
+end
+
+function encode_max_relu_rewrite!(model, args::Array; bound_type="interval")
+    # use relu-re-write 
+    # max(x,y) = 0.5*(x + y + relu(x-y) + relu(y-x))
+
+    # trying something to see if it adds speed by reducing the number of constraints. 
+    encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type) for a in args]
+    bounds = [find_bounds(model, encoded_arg, bound_type=bound_type) for encoded_arg in encoded_args]
+    lower_bounds = [bound_tuple[1] for bound_tuple in bounds]
+    upper_bounds = [bound_tuple[2] for bound_tuple in bounds]
+    need_max, indices_to_keep = check_if_need_max(lower_bounds, upper_bounds)
+
+    if !need_max
+        @debug "There is no need to actually take max." encoded_args[indices_to_keep]
+        @assert length(indices_to_keep) == 1
+        return encoded_args[indices_to_keep...]
+    else 
+        @assert length(args) == 2 
+        @debug "Encoding max of $(args) using relu-rewrite"
+        x = args[1]
+        y = args[2]
+        new_expr = :(0.5*($x + $y + relu($x-$y) + relu($y-$x)))
+        return breakdown_and_encode!(model, new_expr, bound_type=bound_type)
+    end
+end
+function encode!(model, wrapped_f::Sym_f{:relu}, args::Array; bound_type="interval")
+    @debug "Encoding relu of $(args)"
+    encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type) for a in args]
+    @assert length(encoded_args) == 1 # relu is a 1-arg function 
+    lower, upper = find_bounds(model, encoded_args[1], bound_type=bound_type)
+
+    y = encode_relu!(model, encoded_args[1], lower, upper)
     return y
 end
 function encode!(model, wrapped_f::Sym_f{:min}, args::Array; bound_type = "interval")
@@ -137,7 +178,6 @@ function encode!(model, wrapped_f::Sym_f{:unit_step}, args::Array; bound_type="i
     encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type) for a in args]
     @assert length(encoded_args) == 1
 
-    
     lower, upper = find_bounds(model, encoded_args[1], bound_type=bound_type)
     δ = encode_unit_step!(model, encoded_args[1], lower, upper)
     return δ 

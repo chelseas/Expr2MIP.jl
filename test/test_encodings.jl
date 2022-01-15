@@ -100,6 +100,57 @@ function test_max_real()
     end
 end
 
+function test_relu()
+    @testset "test_relus" begin
+        for i = 1:100
+            m = Model()
+            set_optimizer(m, optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0))
+            lb = randn()
+            ub = lb + rand()
+            println("bounds are: [$lb, $ub]")
+            ẑ = @variable(m, base_name="relu input", lower_bound=lb, upper_bound=ub)
+            print(m)
+            z = encode_relu!(m, ẑ::t, lb, ub; relax="none")
+            print(m)
+            optimize!(m)
+            relu(x) = max(x,0.0)
+            @test value(z) == relu(value(ẑ))
+        end
+    end
+end
+
+function test_relu_rewrite_max()
+    @testset "test relu rewrite" begin
+        for i=1:100
+            LBs = randn(2)
+            UBs = rand(2) .+ LBs 
+            @assert all(LBs .<= UBs) #assert each pairing of (LB, UB) has LB <= UB
+
+            m = Model(default_optimizer)
+            x1 = @variable(m, base_name="x1", lower_bound=LBs[1], upper_bound=UBs[1])
+            x2 = @variable(m, base_name="x2", lower_bound=LBs[2], upper_bound=UBs[2])
+            args = [:(x1), :(x2)]
+            print(m)
+            m1 = encode!(m, Sym_f{:max}(), args::Array; bound_type="interval", relu_rewrite=false)
+            print(m)
+            # TODO: have the following version be smarter and not add a bunch of constraints if a max isn't needed.
+            m2 = encode!(m, Sym_f{:max}(), args::Array; bound_type="interval", relu_rewrite=true)
+            print(m)
+            # now fix variables and assert that the max is correct
+            max_xᵢ = -Inf
+            for i = 1:2
+                xᵢ = rand()*(UBs[i] - LBs[i]) + LBs[i]
+                @assert LBs[i] <= xᵢ <= UBs[i]
+                max_xᵢ = max(max_xᵢ, xᵢ)
+                @constraint(m, JuMP.variable_by_name(m, "x$i") == xᵢ)
+            end
+            optimize!(m)
+            @test value(m1) ≈ max_xᵢ
+            @test value(m2) ≈ max_xᵢ
+        end 
+    end
+end
+
 test_abs()
 test_unit_step()
 test_unit_step_times_real_var()
