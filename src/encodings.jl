@@ -7,7 +7,7 @@ global M = 1000000 # very large number.
 global NEW_OVERT_VAR_COUNT=0
 
 using NeuralVerification
-using NeuralVerification: encode_relu, BoundedMixedIntegerLP
+using NeuralVerification: encode_relu, BoundedMixedIntegerLP, TriangularRelaxedLP
 
 # These functions take a JuMP-compatible type, which is either a VariableRef or 
 # GenericAffExpr and return a VariableRef corresponding to the output variable
@@ -46,11 +46,10 @@ function check_if_need_max(LBs, UBs)
     """
     @assert all(LBs .<= UBs) #assert each pairing of (LB, UB) has LB <= UB
     l_max = maximum(LBs)
-    u_max = maximum(UBs)
     # eliminate any x_i from consideration where u_i < l_max since we know y >= l_max >= u_i >= x_i
     indices_to_keep = findall(u -> u >= l_max, UBs)
     need_max = length(indices_to_keep) > 1
-    return need_max, indices_to_keep
+    return need_max, indices_to_keep, l_max
 end
 
 function encode_max_real!(model, inputs::Array, LBs::Array, UBs::Array)
@@ -58,7 +57,8 @@ function encode_max_real!(model, inputs::Array, LBs::Array, UBs::Array)
     This function encodes the maximum of several real-valued variables. 
         Each input is assumed to have both a lower bound and upper bound, contained respectively in the arrays LBs and UBs
     """
-    need_max, indices_to_keep = check_if_need_max(LBs, UBs)
+    need_max, indices_to_keep, l_max = check_if_need_max(LBs, UBs)
+    u_max = maximum(UBs)
     inputs = inputs[indices_to_keep]
     LBs = LBs[indices_to_keep]
     UBs = UBs[indices_to_keep]
@@ -127,7 +127,7 @@ function encode_unit_step_times_var!(model, ẑ::t, x::t, δ::VariableRef, l, u,
     return z::VariableRef
 end
 
-function encode_relu!(model, ẑ::t, lower, upper; relax="none")
+function encode_relu!(model, ẑ::t, lower, upper; relax="triangle")
     """
     This function encodes the z = relu(ẑ) aka max(ẑ,0).
         relax can be:
@@ -147,7 +147,7 @@ function encode_relu!(model, ẑ::t, lower, upper; relax="none")
     elseif relax == "triangle"
         z = @variable(model, base_name="z_relu_$(RELU_COUNT)", lower_bound=max(0.0, lower), upper_bound=max(0.0, upper))
         global RELU_COUNT += 1
-        NeuralVerification.encode_relu(TriangleRelaxedLP(), model, ẑ, z, lower, upper)
+        NeuralVerification.encode_relu(TriangularRelaxedLP(), model, ẑ, z, lower, upper)
         return z::t
     end
 end

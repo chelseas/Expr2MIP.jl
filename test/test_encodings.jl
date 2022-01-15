@@ -120,6 +120,8 @@ function test_relu()
 end
 
 function test_relu_rewrite_max()
+
+    # NOTE: this will fail if the encode_relu! parameter relax defaults to "triangle" and that is expected. 
     @testset "test relu rewrite" begin
         for i=1:100
             LBs = randn(2)

@@ -145,7 +145,7 @@ function encode_max_relu_rewrite!(model, args::Array; bound_type="interval")
     bounds = [find_bounds(model, encoded_arg, bound_type=bound_type) for encoded_arg in encoded_args]
     lower_bounds = [bound_tuple[1] for bound_tuple in bounds]
     upper_bounds = [bound_tuple[2] for bound_tuple in bounds]
-    need_max, indices_to_keep = check_if_need_max(lower_bounds, upper_bounds)
+    need_max, indices_to_keep, l_max = check_if_need_max(lower_bounds, upper_bounds)
 
     if !need_max
         @debug "There is no need to actually take max." encoded_args[indices_to_keep]
