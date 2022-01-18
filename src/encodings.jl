@@ -127,7 +127,7 @@ function encode_unit_step_times_var!(model, ẑ::t, x::t, δ::VariableRef, l, u,
     return z::VariableRef
 end
 
-function encode_relu!(model, ẑ::t, lower, upper; relax="triangle")
+function encode_relu!(model, ẑ::t, lower, upper; relax="none")
     """
     This function encodes the z = relu(ẑ) aka max(ẑ,0).
         relax can be:

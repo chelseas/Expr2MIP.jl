@@ -117,7 +117,7 @@ function encode!(model, wrapped_f::Sym_f{:abs}, args::Array; bound_type="interva
     output_var = encode_abs!(model, input_arg, lower, upper)
     return output_var
 end
-function encode!(model, wrapped_f::Sym_f{:max}, args::Array; bound_type="interval", relu_rewrite=true)
+function encode!(model, wrapped_f::Sym_f{:max}, args::Array; bound_type="interval", relu_rewrite=false)
     if !relu_rewrite 
         return encode_max_direct!(model, args::Array; bound_type=bound_type)
     else # relu_rewrite == true
@@ -139,6 +139,7 @@ end
 function encode_max_relu_rewrite!(model, args::Array; bound_type="interval")
     # use relu-re-write 
     # max(x,y) = 0.5*(x + y + relu(x-y) + relu(y-x))
+    # TODO: Why does using the rewrite + triangle relaxation add so many more constraints?
 
     # trying something to see if it adds speed by reducing the number of constraints. 
     encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type) for a in args]
@@ -156,6 +157,8 @@ function encode_max_relu_rewrite!(model, args::Array; bound_type="interval")
         @debug "Encoding max of $(args) using relu-rewrite"
         x = args[1]
         y = args[2]
+        # TODO: could probably re-use some terms and/or some bounds because (x-y) == -(y-x).
+        # Maybe could add a common term? to connect relu(x-y) and relu(y-x) ?
         new_expr = :(0.5*($x + $y + relu($x-$y) + relu($y-$x)))
         return breakdown_and_encode!(model, new_expr, bound_type=bound_type)
     end
