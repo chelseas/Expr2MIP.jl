@@ -85,7 +85,7 @@ end
 function find_bounds_through_opt(model, objective; lp_relaxation=true)
     undo_relax = nothing
     if lp_relaxation
-        println("relaxing LP...") 
+        @debug("relaxing LP...") 
         undo_relax = relax_integrality(model)
     end
 
@@ -104,7 +104,7 @@ function find_bounds_through_opt(model, objective; lp_relaxation=true)
         undo_relax()
     end
 
-    println("found bounds [$(lower), $(upper)] through opt for $objective")
+    @debug("found bounds [$(lower), $(upper)] through opt for $objective")
 
     return lower, upper
 end
