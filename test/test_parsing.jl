@@ -2,6 +2,7 @@
 include("../src/parsing.jl")
 include("../src/encodings.jl")
 using Test
+using Gurobi
 # ENV["JULIA_DEBUG"] = Main
 
 function test_sym_f()
@@ -217,10 +218,20 @@ end
 function test_overt()
     m = Model(with_optimizer(Gurobi.Optimizer, OutputFlag=0))
     x_ref = @variable(m, x, lower_bound=-1, upper_bound=1.0)
-    e = :(sin(x) + x)
+    e = :(sin(x/2))
     con_ref, ovar_ref = add_constraint!(m, e, :o)
-    # TODO: step through this call (add_constraint) instead of just calling the high level thing
-    # then fix the value of x, max and min oa.output and assert that this is an interval capturing the true value?
+    # then fix the value of x, max and min oa.output and assert that this is an interval capturing the true value
+    model = m;
+    @constraint(model, x_ref == pi/4)
+    @objective(model, Max, ovar_ref)
+    optimize!(model)
+    e_max = value(ovar_ref)
+    @objective(model, Min, ovar_ref)
+    optimize!(model)
+    e_min = value(ovar_ref)
+    e_true = sin(value(x_ref)/2) 
+    @assert (e_min <= e_true) && (e_true <= e_max)
+    println("(e_min, e_true, e_max) = ($(e_min), $(e_true), $(e_max))")
 end
 
 function test_max_rewrite()

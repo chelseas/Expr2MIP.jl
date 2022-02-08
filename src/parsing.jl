@@ -388,25 +388,56 @@ function encode_overapprox!(model::Model, oa::OverApproximation, domain; bound_t
     # TODO: use both here and in fuel gage. (don't forget to push to cloud and then pull on jodhpur)
 end
 
+function replace_arg(arg::GenericAffExpr)
+    global NEW_OVERT_VAR_COUNT += 1
+    return Symbol("nov_$(NEW_OVERT_VAR_COUNT)") 
+end
+replace_arg(arg::VariableRef) = Symbol(name(arg)) 
+replace_arg(arg::t where t <: Real) = arg # identity
+
+function replace_arg_in_model(arg::Symbol, lb, ub)
+    if has_key(model, string(arg))
+        return variable_by_name(model, string(arg))
+    else
+        var = @variable(model, base_name=string(arg), lower_bound=lb, upper_bound=ub)
+
+    end
+end
+
 function call_overt!(model, f, args; bound_type="opt")
+    @debug "Encoding using OVERT"
     # encode args 
     encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type) for a in args]
-    # replace args with new variables
-    new_args = [Symbol("nov_$(NEW_OVERT_VAR_COUNT + i)") for i = 1:length(args)]
-    global NEW_OVERT_VAR_COUNT += length(args) 
+    @debug "Encoded args are " encoded_args 
+    # replace args with new variables IF NEEDED
+    new_args = [replace_arg(a) for a in encoded_args]
+    @debug "New args are " new_args 
+    # global NEW_OVERT_VAR_COUNT += length(args) 
     expr = Expr(:call, f, new_args...)
     # find ranges for new args 
     bounds = [[find_bounds(model, encoded_arg, bound_type=bound_type)...] for encoded_arg in encoded_args]
-    # define new args in model 
-    new_arg_refs = [@variable(model, base_name=string(new_args[i]), lower_bound=bounds[i][1], upper_bound=bounds[i][2]) for i in 1:length(args)]
+    @debug "Bounds for new args are: " bounds 
+    # define new args in model IF NEEDED
+    for (i, new_arg) in enumerate(new_args)
+        if !has_key(model, string(new_arg))   # if it doesn't exist in the model yet (Bc it came from an expression) 
+            new_arg_ref = @variable(model, base_name=string(new_arg), lower_bound=bounds[i][1], upper_bound=bounds[i][2])
+            @debug "New arg ref is " new_arg_ref
+            # connect new arg refs to args in the model that they are equivalent to!!!
+            @debug "Adding constraint to make $(encoded_args[i]) == $(new_arg_ref)"
+            @constraint(model, encoded_args[i] == new_arg_ref)
+        end
+    end
     # construct range_dict
     range_dict = Dict(zip(new_args, bounds)) 
     # overapproximate
+    @debug "Overapproximating $expr over domain $(range_dict)"
     oa = overapprox(expr, range_dict::Dict{Symbol, Array{T, 1}} where {T <: Real}, N=-1)
+    @debug "Output variable of overapprox is: $(oa.output) with range $(oa.output_range)"
+    # TODO: does this output variable have bounds? Or should I add e.g. those from OVERT?
     # deal with overt
     encode_overapprox!(model, oa, oa.ranges)
     @assert has_key(model, string(oa.output))
-    return oa.output # which should already be in the model
+    return JuMP.variable_by_name(model, string(oa.output)) # which should already be in the model
 end
 
 ############################################################
