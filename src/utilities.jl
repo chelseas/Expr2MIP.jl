@@ -106,6 +106,14 @@ function find_bounds_through_opt(model, objective; lp_relaxation=true)
 
     @debug("found bounds [$(lower), $(upper)] through opt for $objective")
 
+    # Error handling: If bounds are so close so as to be ~ equal, but perhaps due to numerical issues, UB < LB, flip them 
+    if isapprox(lower, upper, atol=1e-13) && lower > upper 
+        tmp = lower 
+        lower = upper 
+        upper = tmp 
+        @debug "Fixing numerical issues. bounds are now: [$(lower), $(upper)] "
+    end
+
     return lower, upper
 end
 

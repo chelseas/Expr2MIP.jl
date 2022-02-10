@@ -5,7 +5,6 @@ using OVERT
 include("types.jl")
 include("encodings.jl")
 include("utilities.jl")
-ENV["JULIA_DEBUG"] = "" # Main
 
 ############################################################
 #### High Level Functions #####
