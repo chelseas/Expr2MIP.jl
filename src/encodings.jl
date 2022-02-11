@@ -44,8 +44,8 @@ function check_if_need_max(LBs, UBs)
     """
     A helper function to determine if we actually need to take a max or not.
     """
-    println("LBs: $(LBs)")
-    println("UBs: $(UBs)")
+    @debug("LBs: $(LBs)")
+    @debug("UBs: $(UBs)")
     @assert all(LBs .<= UBs) #assert each pairing of (LB, UB) has LB <= UB
     l_max = maximum(LBs)
     # eliminate any x_i from consideration where u_i < l_max since we know y >= l_max >= u_i >= x_i
