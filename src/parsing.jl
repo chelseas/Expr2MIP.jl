@@ -227,7 +227,7 @@ function encode!(model, wrapped_f::Sym_f{:-}, args::Array; bound_type="interval"
     return -(encoded_args...)
 end
 function encode!(model, wrapped_f::Sym_f{:*}, args::Array; bound_type = "interval")
-    #println("Dealing with multiplication")
+    println("Dealing with multiplication of args: $(args)")
     isnn = .!is_number.(args)
     if sum(isnn) > 1 # multiplication of two real valued variables is present
         # todo: check we don't have e.g. relu*relu or abs*abs...because I still have to add support to overt for relu*relu
