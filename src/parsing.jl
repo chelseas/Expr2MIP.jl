@@ -17,18 +17,7 @@ function add_constraint!(model, c::T where T<:Real, var::Symbol; bound_type="int
     @debug "adding constraint $c::Real"
     c_jumpified = breakdown_and_encode!(model, c, bound_type=bound_type)
 
-    if haskey(model, var)
-        @debug "retrieving symbol key $var"
-        v = model[var]
-    elseif !isnothing(JuMP.variable_by_name(model, string(var)))
-        @debug "retrieving string key $var"
-        v = JuMP.variable_by_name(model, string(var))
-    else # variable does not exist yet
-        # Find upper and lower bounds then create the variable
-        @debug "creating new variable"
-        lower, upper = find_bounds(model, c_jumpified, bound_type=bound_type)
-        v = @variable(model, base_name=string(var), lower_bound=lower, upper_bound=upper) # output variable
-    end
+    v = get_or_make_jump_var(model, var, c_jumpified, bound_type)
 
     con_ref = @constraint(model, v == c_jumpified) # actually add the constraint, at last!
     return con_ref, v
@@ -37,6 +26,7 @@ end
 function add_constraint!(model, c::Expr, var::Symbol; bound_type="interval")
     """
     Adds constraints of the form c == var
+    Every symbol in the expression c must exist, but the variable var may not exist yet.
     """
     @debug "adding constraint $var == $c::Expr"
     # adds constraints to the jump model of the form: var == c
@@ -45,6 +35,29 @@ function add_constraint!(model, c::Expr, var::Symbol; bound_type="interval")
     c_jumpified = breakdown_and_encode!(model, c, bound_type=bound_type)
     # c_jumpified may come back as: v_46 or v_12 - 25 + 14
     
+    v = get_or_make_jump_var(model, var, c_jumpified, bound_type)
+
+    #println("v = $v")
+    #println("typeof(v)= $(typeof(v))")
+    con_ref = @constraint(model, v == c_jumpified) # actually add the constraint, at last!
+    return con_ref, v
+end
+
+function add_constraint!(model::Model, c::Symbol, var::Symbol; bound_type="interval")
+    """
+    Add constraints of the form c::Symbol == var.
+    c must exist in the model already, var may not exist yet.
+    """
+    @debug "adding constraint $var == $c::Symbol"
+    c_jumpified = breakdown_and_encode!(model, c, bound_type=bound_type)
+    v = get_or_make_jump_var(model, var, c_jumpified, bound_type)
+    con_ref = @constraint(model, v == c_jumpified) # actually add the constraint, at last!
+    return con_ref, v
+end
+
+# helper 
+# TODO: this function is much the same as convert_affine_to_jump for var. could they be combined in some way?
+function get_or_make_jump_var(model, var, c_jumpified, bound_type)
     if haskey(model, var)
         @debug "retrieving symbol key $var"
         v = model[var]
@@ -58,11 +71,7 @@ function add_constraint!(model, c::Expr, var::Symbol; bound_type="interval")
         lower, upper = find_bounds(model, c_jumpified, bound_type=bound_type)
         v = @variable(model, base_name=string(var), lower_bound=lower, upper_bound=upper) # output variable
     end
-
-    #println("v = $v")
-    #println("typeof(v)= $(typeof(v))")
-    con_ref = @constraint(model, v == c_jumpified) # actually add the constraint, at last!
-    return con_ref, v
+    return v
 end
 
 # max(x + y + 7z, y + z)
@@ -404,6 +413,7 @@ function replace_arg_in_model(arg::Symbol, lb, ub)
 end
 
 function call_overt!(model, f, args; bound_type="opt")
+    println("Encoding $f applied to $args using OVERT! :) ")
     @debug "Encoding using OVERT"
     # encode args 
     encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type) for a in args]
