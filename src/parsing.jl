@@ -43,7 +43,7 @@ function add_constraint!(model, c::Expr, var::Symbol; bound_type="interval")
     return con_ref, v
 end
 
-function add_constraint!(model::Model, c::Symbol, var::Symbol; bound_type="interval")
+function add_constraint!(model, c::Symbol, var::Symbol; bound_type="interval")
     """
     Add constraints of the form c::Symbol == var.
     c must exist in the model already, var may not exist yet.
