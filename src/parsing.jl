@@ -1,7 +1,6 @@
 using JuMP
 import JuMP.MOI.OPTIMAL, JuMP.MOI.INFEASIBLE
-# using OVERT
-include("../../OVERT.jl/src/overapprox_nd.jl")
+using OVERT
 
 include("types.jl")
 include("encodings.jl")
@@ -121,7 +120,7 @@ function breakdown_and_encode!(model, expr::Expr; params=EncodingParameters(), e
     else # assuming that this should be passed to OVERT
         println("calling OVERT for expr $expr")
         # smooth nonlinearity
-        out = call_overt!(model, f, args; rel_error_tol=params.rel_error_tol, expr_map=expr_map)
+        out = call_overt!(model, f, args; params=params, expr_map=expr_map)
         # add mapping from expression expr to jump reference 
         expr_map[expr] = out
         return out
@@ -402,7 +401,7 @@ end
 function encode_overapprox!(model::Model, oa::OverApproximation, domain; params=EncodingParameters(), expr_map=Dict())
     # From the overapproximation object we want to encode the approx_eq and the approx_ineq
     # we need all variables to be defined before they are encoded bc we expect ranges
-    println("Encoding the overapproximation using $bound_type bounding.")
+    println("Encoding the overapproximation using $(params.bound_type) bounding.")
     define_state_variables!(model, domain)
     # approx_eq
     for c in oa.approx_eq

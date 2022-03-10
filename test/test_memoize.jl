@@ -29,23 +29,25 @@ function test2()
     print(model)
 end 
 
-model = Model(Gurobi.Optimizer)
-expr_map = Dict()
-params = EncodingParameters("opt", 2e-2)
-x = @variable(model, base_name="x")
-set_lower_bound(x, 0.0)
-set_upper_bound(x, 1.0)
-add_constraint!(model, :(x*x), :e_1, expr_map=expr_map)
-model
-add_constraint!(model, :(x*x), :e_2, expr_map=expr_map)
-model
+function test3()
+    model = Model(Gurobi.Optimizer)
+    expr_map = Dict()
+    params = EncodingParameters("opt", 2e-2)
+    x = @variable(model, base_name="x")
+    set_lower_bound(x, 0.0)
+    set_upper_bound(x, 1.0)
+    add_constraint!(model, :(x*x), :e_1, expr_map=expr_map)
+    model
+    add_constraint!(model, :(x*x), :e_2, expr_map=expr_map)
+    model
 
-add_constraint!(model, :(cos(x)), :e_3, expr_map=expr_map)
-model
+    add_constraint!(model, :(cos(x)), :e_3, expr_map=expr_map)
+    model
 
-add_constraint!(model, :((x*x) + cos(x)), :e_4, expr_map=expr_map)
-model
+    add_constraint!(model, :((x*x) + cos(x)), :e_4, expr_map=expr_map)
+    model
 
-add_constraint!(model, :((x*x) * cos(x)), :e_5, expr_map=expr_map)
-model
+    add_constraint!(model, :((x*x) * cos(x)), :e_5, expr_map=expr_map)
+    model
+end
 
