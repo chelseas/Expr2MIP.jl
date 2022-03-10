@@ -1,41 +1,53 @@
 using JuMP
 import JuMP.MOI.OPTIMAL, JuMP.MOI.INFEASIBLE
-using OVERT
+# using OVERT
+include("../../OVERT.jl/src/overapprox_nd.jl")
 
 include("types.jl")
 include("encodings.jl")
 include("utilities.jl")
 
+########
+# Data Structure to Hold Parameters 
+########
+mutable struct EncodingParameters
+    bound_type::String 
+    rel_error_tol::Float64 # for OVERT calls
+end
+
+EncodingParameters() = EncodingParameters("interval", 1e-2)
+
 ############################################################
 #### High Level Functions #####
 ############################################################
 
-function add_constraint!(model, c::T where T<:Real, var::Symbol; bound_type="interval", expr_map=Dict())
+function add_constraint!(model, c::T where T<:Real, var::Symbol; params=EncodingParameters(), expr_map=Dict())
     """
     Adds constraints of the form c == var
     """
     @debug "adding constraint $c::Real"
-    c_jumpified = breakdown_and_encode!(model, c, bound_type=bound_type, expr_map=expr_map)
+    c_jumpified = breakdown_and_encode!(model, c, params=params, expr_map=expr_map)
 
-    v = get_or_make_jump_var(model, var, c_jumpified, bound_type)
+    v = get_or_make_jump_var(model, var, c_jumpified, params.bound_type)
 
     con_ref = @constraint(model, v == c_jumpified) # actually add the constraint, at last!
     return con_ref, v
 end
 # the high-level function
-function add_constraint!(model, c::Expr, var::Symbol; bound_type="interval", expr_map=Dict())
+function add_constraint!(model, c::Expr, var::Symbol; params=EncodingParameters(), expr_map=Dict())
     """
     Adds constraints of the form c == var
     Every symbol in the expression c must exist, but the variable var may not exist yet.
     """
     @debug "adding constraint $var == $c::Expr"
+    println("encoding parameters are: $params")
     # adds constraints to the jump model of the form: var == c
     # where c may be an arbitrary expression like max(10*u, step(z)*u + 6) - 12
     c = convert_step_times_var(c)
-    c_jumpified = breakdown_and_encode!(model, c, bound_type=bound_type, expr_map=expr_map)
+    c_jumpified = breakdown_and_encode!(model, c, params=params, expr_map=expr_map)
     # c_jumpified may come back as: v_46 or v_12 - 25 + 14
     
-    v = get_or_make_jump_var(model, var, c_jumpified, bound_type)
+    v = get_or_make_jump_var(model, var, c_jumpified, params.bound_type)
 
     #println("v = $v")
     #println("typeof(v)= $(typeof(v))")
@@ -43,14 +55,14 @@ function add_constraint!(model, c::Expr, var::Symbol; bound_type="interval", exp
     return con_ref, v
 end
 
-function add_constraint!(model, c::Symbol, var::Symbol; bound_type="interval", expr_map=Dict())
+function add_constraint!(model, c::Symbol, var::Symbol; params=EncodingParameters(), expr_map=Dict())
     """
     Add constraints of the form c::Symbol == var.
     c must exist in the model already, var may not exist yet.
     """
     @debug "adding constraint $var == $c::Symbol"
-    c_jumpified = breakdown_and_encode!(model, c, bound_type=bound_type, expr_map=expr_map)
-    v = get_or_make_jump_var(model, var, c_jumpified, bound_type)
+    c_jumpified = breakdown_and_encode!(model, c, params=params, expr_map=expr_map)
+    v = get_or_make_jump_var(model, var, c_jumpified, params.bound_type)
     con_ref = @constraint(model, v == c_jumpified) # actually add the constraint, at last!
     return con_ref, v
 end
@@ -75,7 +87,7 @@ function get_or_make_jump_var(model, var, c_jumpified, bound_type)
 end
 
 # max(x + y + 7z, y + z)
-function breakdown_and_encode!(model, expr::Expr; bound_type="interval", expr_map=Dict())
+function breakdown_and_encode!(model, expr::Expr; params=EncodingParameters(), expr_map=Dict())
     """
     Main Parser.
     This is the main function that gets called inside the encode! functions in order to parse arguments. 
@@ -102,21 +114,21 @@ function breakdown_and_encode!(model, expr::Expr; bound_type="interval", expr_ma
         return jumped_expr
     elseif f ∈ [:abs, :max, :min, :relu, :unit_step, :unit_step_times_var, :+, :-, :*, :/]
         @debug "encoding PWL or affine function $f"
-        out = encode!(model, Sym_f(f), args; bound_type=bound_type, expr_map=expr_map) # returns jump compatible type
+        out = encode!(model, Sym_f(f), args; params=params, expr_map=expr_map) # returns jump compatible type
         # add mapping from expression expr to jump reference 
         expr_map[expr] = out
         return out
     else # assuming that this should be passed to OVERT
         println("calling OVERT for expr $expr")
         # smooth nonlinearity
-        out = call_overt!(model, f, args; expr_map=expr_map)
+        out = call_overt!(model, f, args; rel_error_tol=params.rel_error_tol, expr_map=expr_map)
         # add mapping from expression expr to jump reference 
         expr_map[expr] = out
         return out
     end
 end
 
-function breakdown_and_encode!(model, s::Union{Symbol, T where T <: Real}; bound_type="interval", expr_map=Dict())
+function breakdown_and_encode!(model, s::Union{Symbol, T where T <: Real}; params=EncodingParameters(), expr_map=Dict())
     @debug "breakdown and encode symbol or number $s"
     return convert_affine_to_jump(s, model)
 end
@@ -128,46 +140,46 @@ end
 # Encode into the jump model ####################################################
 ##################################################################################
 # GenericAffineExpr -> JumpVariableRef dict for memoization later?
-function encode!(model, wrapped_f::Sym_f{:abs}, args::Array; bound_type="interval", expr_map=Dict()) # -> JuMP variable ref
+function encode!(model, wrapped_f::Sym_f{:abs}, args::Array; params=EncodingParameters(), expr_map=Dict()) # -> JuMP variable ref
     """
     This function handles recursive parsing and encoding of absolute value. 
     """
     @debug "encoding abs of $(args[1])"
     @assert length(args) == 1 # scalar function applied to scalar input
-    encoded_args = [breakdown_and_encode!(model, a; bound_type=bound_type, expr_map=expr_map) for a in args]
+    encoded_args = [breakdown_and_encode!(model, a; params=params, expr_map=expr_map) for a in args]
     input_arg = encoded_args[1]
 
-    lower, upper = find_bounds(model, input_arg, bound_type=bound_type)
+    lower, upper = find_bounds(model, input_arg, bound_type=params.bound_type)
     output_var = encode_abs!(model, input_arg, lower, upper)
     return output_var
 end
-function encode!(model, wrapped_f::Sym_f{:max}, args::Array; bound_type="interval", expr_map=Dict(), relu_rewrite=false)
+function encode!(model, wrapped_f::Sym_f{:max}, args::Array; params=EncodingParameters(), expr_map=Dict(), relu_rewrite=false)
     if !relu_rewrite 
-        return encode_max_direct!(model, args::Array; bound_type=bound_type, expr_map=expr_map)
+        return encode_max_direct!(model, args::Array; params=params, expr_map=expr_map)
     else # relu_rewrite == true
-        return encode_max_relu_rewrite!(model, args::Array; bound_type=bound_type, expr_map=expr_map)
+        return encode_max_relu_rewrite!(model, args::Array; params=params, expr_map=expr_map)
     end
 end
-function encode_max_direct!(model, args::Array; bound_type="interval", expr_map=Dict())
+function encode_max_direct!(model, args::Array; params=EncodingParameters(), expr_map=Dict())
     @debug "encoding max of $(args) EXACTLY"
-    encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type, expr_map=expr_map) for a in args]
+    encoded_args = [breakdown_and_encode!(model, a, params=params, expr_map=expr_map) for a in args]
     n_args = length(encoded_args)
 
-    bounds = [find_bounds(model, encoded_arg, bound_type=bound_type) for encoded_arg in encoded_args]
+    bounds = [find_bounds(model, encoded_arg, bound_type=params.bound_type) for encoded_arg in encoded_args]
     lower_bounds = [bound_tuple[1] for bound_tuple in bounds]
     upper_bounds = [bound_tuple[2] for bound_tuple in bounds]
     y = encode_max_real!(model, encoded_args, lower_bounds, upper_bounds)
     return y
 end
 
-function encode_max_relu_rewrite!(model, args::Array; bound_type="interval", expr_map=Dict())
+function encode_max_relu_rewrite!(model, args::Array; params=EncodingParameters(), expr_map=Dict())
     # use relu-re-write 
     # max(x,y) = 0.5*(x + y + relu(x-y) + relu(y-x))
     # TODO: Why does using the rewrite + triangle relaxation add so many more constraints?
 
     # trying something to see if it adds speed by reducing the number of constraints. 
-    encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type, expr_map=expr_map) for a in args]
-    bounds = [find_bounds(model, encoded_arg, bound_type=bound_type) for encoded_arg in encoded_args]
+    encoded_args = [breakdown_and_encode!(model, a, params=params, expr_map=expr_map) for a in args]
+    bounds = [find_bounds(model, encoded_arg, bound_type=params.bound_type) for encoded_arg in encoded_args]
     lower_bounds = [bound_tuple[1] for bound_tuple in bounds]
     upper_bounds = [bound_tuple[2] for bound_tuple in bounds]
     need_max, indices_to_keep, l_max = check_if_need_max(lower_bounds, upper_bounds)
@@ -184,42 +196,42 @@ function encode_max_relu_rewrite!(model, args::Array; bound_type="interval", exp
         # TODO: could probably re-use some terms and/or some bounds because (x-y) == -(y-x).
         # Maybe could add a common term? to connect relu(x-y) and relu(y-x) ?
         new_expr = :(0.5*($x + $y + relu($x-$y) + relu($y-$x)))
-        return breakdown_and_encode!(model, new_expr, bound_type=bound_type, expr_map=expr_map)
+        return breakdown_and_encode!(model, new_expr, params=params, expr_map=expr_map)
     end
 end
-function encode!(model, wrapped_f::Sym_f{:relu}, args::Array; bound_type="interval", expr_map=Dict())
+function encode!(model, wrapped_f::Sym_f{:relu}, args::Array; params=EncodingParameters(), expr_map=Dict())
     @debug "Encoding relu of $(args)"
-    encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type, expr_map=expr_map) for a in args]
+    encoded_args = [breakdown_and_encode!(model, a, params=params, expr_map=expr_map) for a in args]
     @assert length(encoded_args) == 1 # relu is a 1-arg function 
-    lower, upper = find_bounds(model, encoded_args[1], bound_type=bound_type)
+    lower, upper = find_bounds(model, encoded_args[1], bound_type=params.bound_type)
 
     y = encode_relu!(model, encoded_args[1], lower, upper)
     return y
 end
-function encode!(model, wrapped_f::Sym_f{:min}, args::Array; bound_type = "interval", expr_map=Dict())
+function encode!(model, wrapped_f::Sym_f{:min}, args::Array; params=EncodingParameters(), expr_map=Dict())
     @debug "encoding min of $(args)"
-    return -encode!(model, Sym_f(:max), [:(-$a) for a in args], bound_type=bound_type, expr_map=expr_map)
+    return -encode!(model, Sym_f(:max), [:(-$a) for a in args], params=params, expr_map=expr_map)
 end
-function encode!(model, wrapped_f::Sym_f{:unit_step}, args::Array; bound_type="interval", expr_map=Dict())
+function encode!(model, wrapped_f::Sym_f{:unit_step}, args::Array; params=EncodingParameters(), expr_map=Dict())
     @debug "encoding unit step of $(args)"
-    encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type, expr_map=expr_map) for a in args]
+    encoded_args = [breakdown_and_encode!(model, a, params=params, expr_map=expr_map) for a in args]
     @assert length(encoded_args) == 1
 
-    lower, upper = find_bounds(model, encoded_args[1], bound_type=bound_type)
+    lower, upper = find_bounds(model, encoded_args[1], bound_type=params.bound_type)
     δ = encode_unit_step!(model, encoded_args[1], lower, upper)
     return δ 
 end
-function encode!(model, wrapped_f::Sym_f{:unit_step_times_var}, args::Array; bound_type = "interval", expr_map=Dict())
+function encode!(model, wrapped_f::Sym_f{:unit_step_times_var}, args::Array; params=EncodingParameters(), expr_map=Dict())
     @debug "encode unit step times var of $(args)"
     ẑ, x = args
     # z = unit_step(ẑ)*x
-    ẑₑ = breakdown_and_encode!(model, ẑ, bound_type=bound_type, expr_map=expr_map)
-    xₑ = breakdown_and_encode!(model, x, bound_type=bound_type, expr_map=expr_map)
+    ẑₑ = breakdown_and_encode!(model, ẑ, params=params, expr_map=expr_map)
+    xₑ = breakdown_and_encode!(model, x, params=params, expr_map=expr_map)
     δ = @variable(model, binary=true, base_name="δ_ustv")
 
     # TODO: @castrong add computation of lower and upper bounds of both input to the unit step and the real valued variable 
-    lower_ẑₑ, upper_ẑₑ = find_bounds(model, ẑₑ, bound_type=bound_type)
-    lower_xₑ, upper_xₑ = find_bounds(model, xₑ, bound_type=bound_type)
+    lower_ẑₑ, upper_ẑₑ = find_bounds(model, ẑₑ, bound_type=params.bound_type)
+    lower_xₑ, upper_xₑ = find_bounds(model, xₑ, bound_type=params.bound_type)
     z = encode_unit_step_times_var!(model, ẑₑ, xₑ, δ, lower_ẑₑ, upper_ẑₑ, lower_xₑ, upper_xₑ)
     return z
 end
@@ -234,35 +246,35 @@ end
 #     z = encode_unit_step_times_var!(model, ẑₑ, xₑ, δ, l, u, γ, ζ)
 #     return z
 # end
-function encode!(model, wrapped_f::Sym_f{:+}, args::Array; bound_type="interval", expr_map=Dict())
-    encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type, expr_map=expr_map) for a in args]
+function encode!(model, wrapped_f::Sym_f{:+}, args::Array; params=EncodingParameters(), expr_map=Dict())
+    encoded_args = [breakdown_and_encode!(model, a, params=params, expr_map=expr_map) for a in args]
     return +(encoded_args...)
 end
-function encode!(model, wrapped_f::Sym_f{:-}, args::Array; bound_type="interval", expr_map=Dict())
-    encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type, expr_map=expr_map) for a in args]
+function encode!(model, wrapped_f::Sym_f{:-}, args::Array; params=EncodingParameters(), expr_map=Dict())
+    encoded_args = [breakdown_and_encode!(model, a, params=params, expr_map=expr_map) for a in args]
     return -(encoded_args...)
 end
-function encode!(model, wrapped_f::Sym_f{:*}, args::Array; bound_type = "interval", expr_map=Dict())
+function encode!(model, wrapped_f::Sym_f{:*}, args::Array; params=EncodingParameters(), expr_map=Dict())
     println("Dealing with multiplication of args: $(args)")
     isnn = .!is_number.(args)
     if sum(isnn) > 1 # multiplication of two real valued variables is present
         # todo: check we don't have e.g. relu*relu or abs*abs...because I still have to add support to overt for relu*relu
         # also check for unit_step*unit_step and steptimesvar*steptimesvar
-        var = call_overt!(model, :*, args[isnn], expr_map=expr_map) # encodes this arg(s) that contain variables. returns jump var
+        var = call_overt!(model, :*, args[isnn], params=params, expr_map=expr_map) # encodes this arg(s) that contain variables. returns jump var
         return *(var, args[.!isnn]...) # multiply variable and coefficient together
     else # "outer affine" e.g. const*relu
-        encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type, expr_map=expr_map) for a in args[isnn]]
+        encoded_args = [breakdown_and_encode!(model, a, params=params, expr_map=expr_map) for a in args[isnn]]
         return *(encoded_args..., args[.!isnn]...)
     end
 end
-function encode!(model, wrapped_f::Sym_f{:/}, args::Array; bound_type = "interval", expr_map=Dict())
+function encode!(model, wrapped_f::Sym_f{:/}, args::Array; params=EncodingParameters(), expr_map=Dict())
     @assert length(args) == 2
     if !is_number(args[2]) # call overt to handle c/x or c/(x+y) type stuff
-        var = call_overt!(model, :/, args; expr_map=expr_map)
+        var = call_overt!(model, :/, args; params=params, expr_map=expr_map)
         return var
     else  # looks something like: relu(x) / c, perhaps. "outer affine"
         # is_number(args[2]) # second arg is number
-        arg1 = breakdown_and_encode!(model, args[1], bound_type=bound_type, expr_map=expr_map)
+        arg1 = breakdown_and_encode!(model, args[1], params=params, expr_map=expr_map)
         return arg1/args[2] # use operator overloadding to construct GenericAffExpr
     end   
 end
@@ -387,7 +399,7 @@ function define_state_variables!(model, domain)
     return nothing # purely a side effect function
 end
 
-function encode_overapprox!(model::Model, oa::OverApproximation, domain; bound_type="opt")
+function encode_overapprox!(model::Model, oa::OverApproximation, domain; params=EncodingParameters(), expr_map=Dict())
     # From the overapproximation object we want to encode the approx_eq and the approx_ineq
     # we need all variables to be defined before they are encoded bc we expect ranges
     println("Encoding the overapproximation using $bound_type bounding.")
@@ -398,7 +410,7 @@ function encode_overapprox!(model::Model, oa::OverApproximation, domain; bound_t
         LHS = c.args[2] # just a symbol
         @assert typeof(LHS) == Symbol 
         RHS = c.args[3] # an expr
-        con_ref, output_ref = add_constraint!(model, RHS, LHS, bound_type=bound_type)
+        con_ref, output_ref = add_constraint!(model, RHS, LHS; params=params, expr_map=expr_map)
     end
     # approx_ineq
     for c in oa.approx_ineq
@@ -428,11 +440,11 @@ function replace_arg_in_model(arg::Symbol, lb, ub)
     end
 end
 
-function call_overt!(model, f, args; bound_type="opt", expr_map=Dict())
+function call_overt!(model, f, args; params=EncodingParameters(), expr_map=Dict(), N=-1)
     println("Encoding $f applied to $args using OVERT! :) ")
     @debug "Encoding using OVERT"
     # encode args 
-    encoded_args = [breakdown_and_encode!(model, a, bound_type=bound_type, expr_map=expr_map) for a in args]
+    encoded_args = [breakdown_and_encode!(model, a, params=params, expr_map=expr_map) for a in args]
     @debug "Encoded args are " encoded_args 
     # replace args with new variables IF NEEDED
     new_args = [replace_arg(a) for a in encoded_args]
@@ -440,7 +452,7 @@ function call_overt!(model, f, args; bound_type="opt", expr_map=Dict())
     # global NEW_OVERT_VAR_COUNT += length(args) 
     expr = Expr(:call, f, new_args...)
     # find ranges for new args 
-    bounds = [[find_bounds(model, encoded_arg, bound_type=bound_type)...] for encoded_arg in encoded_args]
+    bounds = [[find_bounds(model, encoded_arg, bound_type=params.bound_type)...] for encoded_arg in encoded_args]
     @debug "Bounds for new args are: " bounds 
     # define new args in model IF NEEDED
     for (i, new_arg) in enumerate(new_args)
@@ -456,11 +468,11 @@ function call_overt!(model, f, args; bound_type="opt", expr_map=Dict())
     range_dict = Dict(zip(new_args, bounds)) 
     # overapproximate
     @debug "Overapproximating $expr over domain $(range_dict)"
-    oa = overapprox(expr, range_dict::Dict{Symbol, Array{T, 1}} where {T <: Real}, N=-1)
+    oa = overapprox(expr, range_dict::Dict{Symbol, Array{T, 1}} where {T <: Real}, N=N, rel_error_tol=params.rel_error_tol)
     @debug "Output variable of overapprox is: $(oa.output) with range $(oa.output_range)"
     # TODO: does this output variable have bounds? Or should I add e.g. those from OVERT?
     # deal with overt
-    encode_overapprox!(model, oa, oa.ranges)
+    encode_overapprox!(model, oa, oa.ranges; params=params, expr_map=expr_map)
     @assert has_key(model, string(oa.output))
     return JuMP.variable_by_name(model, string(oa.output)) # which should already be in the model
 end
