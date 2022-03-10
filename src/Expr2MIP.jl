@@ -16,5 +16,6 @@ export add_constraint!,
        Basic2Expr,
        find_bounds,
        encode_overapprox!,
-       define_state_variables!
+       define_state_variables!,
+       EncodingParameters
 end
