@@ -440,6 +440,8 @@ function replace_arg_in_model(arg::Symbol, lb, ub)
 end
 
 function call_overt!(model, f, args; params=EncodingParameters(), expr_map=Dict(), N=-1)
+    # TODO: deal with situation where you have multiplication by zero. e.g. 
+    # TODO: with the translation invariant dimensions, some of the entries of K are zero. when this gets multiplied by other stuff in M(A + BK) then it gets zeroed out. 
     println("Encoding $f applied to $args using OVERT! :) ")
     @debug "Encoding using OVERT"
     # encode args 
