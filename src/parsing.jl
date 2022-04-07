@@ -483,7 +483,7 @@ function call_overt!(model, f, args; params=EncodingParameters(), expr_map=Dict(
         return oa.output
     else
         error("Whodunnit?? oa.output is not a Symbol or Real. It's $(oa.output)::$(typeof(oa.output))")
-    else
+    end
         
 end
 
