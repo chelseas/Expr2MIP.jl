@@ -471,11 +471,20 @@ function call_overt!(model, f, args; params=EncodingParameters(), expr_map=Dict(
     @debug "Overapproximating $expr over domain $(range_dict)"
     oa = overapprox(expr, range_dict::Dict{Symbol, Array{T, 1}} where {T <: Real}, N=N, rel_error_tol=params.rel_error_tol)
     @debug "Output variable of overapprox is: $(oa.output) with range $(oa.output_range)"
-    # TODO: does this output variable have bounds? Or should I add e.g. those from OVERT?
+    # TODO: does this output variable have bounds? Or should I add e.g. those from OVERT? --> I think the output variable gets bounds from the define_state_variables call inside encode_overapprox?
     # deal with overt
     encode_overapprox!(model, oa, oa.ranges; params=params, expr_map=expr_map)
-    @assert has_key(model, string(oa.output))
-    return JuMP.variable_by_name(model, string(oa.output)) # which should already be in the model
+    if oa.output isa Symbol
+        @assert has_key(model, string(oa.output))
+        return JuMP.variable_by_name(model, string(oa.output)) # which should already be in the model
+    elseif oa.output isa Real
+        # e.g. if multiplication by zero returns 0.0 (float)
+        @debug "overapprox has returned a real value as output. $f applied to $args = $(oa.output)"
+        return oa.output
+    else
+        error("Whodunnit?? oa.output is not a Symbol or Real. It's $(oa.output)::$(typeof(oa.output))")
+    else
+        
 end
 
 ############################################################
