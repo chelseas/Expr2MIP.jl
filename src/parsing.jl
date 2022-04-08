@@ -12,9 +12,10 @@ include("utilities.jl")
 mutable struct EncodingParameters
     bound_type::String 
     rel_error_tol::Float64 # for OVERT calls
+    N::Integer # fidelity parameter for overt calls
 end
 
-EncodingParameters() = EncodingParameters("interval", 1e-2)
+EncodingParameters() = EncodingParameters("interval", 1e-2, -1)
 
 ############################################################
 #### High Level Functions #####
@@ -440,7 +441,7 @@ function replace_arg_in_model(arg::Symbol, lb, ub)
     end
 end
 
-function call_overt!(model, f, args; params=EncodingParameters(), expr_map=Dict(), N=-1)
+function call_overt!(model, f, args; params=EncodingParameters(), expr_map=Dict())
     # TODO: deal with situation where you have multiplication by zero. e.g. 
     # TODO: with the translation invariant dimensions, some of the entries of K are zero. when this gets multiplied by other stuff in M(A + BK) then it gets zeroed out. 
     println("Encoding $f applied to $args using OVERT! :) ")
@@ -470,7 +471,7 @@ function call_overt!(model, f, args; params=EncodingParameters(), expr_map=Dict(
     range_dict = Dict(zip(new_args, bounds)) 
     # overapproximate
     @debug "Overapproximating $expr over domain $(range_dict)"
-    oa = overapprox(expr, range_dict::Dict{Symbol, Array{T, 1}} where {T <: Real}, N=N, rel_error_tol=params.rel_error_tol)
+    oa = overapprox(expr, range_dict::Dict{Symbol, Array{T, 1}} where {T <: Real}, N=params.N, rel_error_tol=params.rel_error_tol)
     @debug "Output variable of overapprox is: $(oa.output) with range $(oa.output_range)"
     # TODO: does this output variable have bounds? Or should I add e.g. those from OVERT? --> I think the output variable gets bounds from the define_state_variables call inside encode_overapprox?
     # deal with overt
