@@ -97,7 +97,7 @@ function breakdown_and_encode!(model, expr::Expr; params=EncodingParameters(), e
 
     # If the expr is already present in the model, just return the jump reference
     if haskey(expr_map, expr)
-        @debug "expr $expr already present in the model. Returning $(expr_map[expr])"
+        println("expr $expr already present in the model. Returning $(expr_map[expr])")
         return expr_map[expr]
     end
 
