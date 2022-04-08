@@ -39,7 +39,7 @@ function add_constraint!(model, c::Expr, var::Symbol; params=EncodingParameters(
     Every symbol in the expression c must exist, but the variable var may not exist yet.
     """
     @debug "adding constraint $var == $c::Expr"
-    println("encoding parameters are: $params")
+    # println("encoding parameters are: $params")
     # adds constraints to the jump model of the form: var == c
     # where c may be an arbitrary expression like max(10*u, step(z)*u + 6) - 12
     c = convert_step_times_var(c)
@@ -97,6 +97,7 @@ function breakdown_and_encode!(model, expr::Expr; params=EncodingParameters(), e
 
     # If the expr is already present in the model, just return the jump reference
     if haskey(expr_map, expr)
+        @debug "expr $expr already present in the model. Returning $(expr_map[expr])"
         return expr_map[expr]
     end
 
@@ -254,7 +255,7 @@ function encode!(model, wrapped_f::Sym_f{:-}, args::Array; params=EncodingParame
     return -(encoded_args...)
 end
 function encode!(model, wrapped_f::Sym_f{:*}, args::Array; params=EncodingParameters(), expr_map=Dict())
-    println("Dealing with multiplication of args: $(args)")
+    # println("Dealing with multiplication of args: $(args)")
     isnn = .!is_number.(args)
     if sum(isnn) > 1 # multiplication of two real valued variables is present
         # todo: check we don't have e.g. relu*relu or abs*abs...because I still have to add support to overt for relu*relu
