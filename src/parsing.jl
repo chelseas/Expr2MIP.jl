@@ -98,7 +98,7 @@ function breakdown_and_encode!(model, expr::Expr; params=EncodingParameters(), e
 
     # If the expr is already present in the model, just return the jump reference
     if haskey(expr_map, expr)
-        println("expr $expr already present in the model. Returning $(expr_map[expr])")
+        @debug("expr $expr already present in the model. Returning $(expr_map[expr])")
         return expr_map[expr]
     end
 
@@ -120,7 +120,7 @@ function breakdown_and_encode!(model, expr::Expr; params=EncodingParameters(), e
         expr_map[expr] = out
         return out
     else # assuming that this should be passed to OVERT
-        println("calling OVERT for expr $expr")
+        @debug("calling OVERT for expr $expr")
         # smooth nonlinearity
         out = call_overt!(model, f, args; params=params, expr_map=expr_map)
         # add mapping from expression expr to jump reference 
@@ -444,7 +444,7 @@ end
 function call_overt!(model, f, args; params=EncodingParameters(), expr_map=Dict())
     # TODO: deal with situation where you have multiplication by zero. e.g. 
     # TODO: with the translation invariant dimensions, some of the entries of K are zero. when this gets multiplied by other stuff in M(A + BK) then it gets zeroed out. 
-    println("Encoding $f applied to $args using OVERT! :) ")
+    @debug("Encoding $f applied to $args using OVERT! :) ")
     @debug "Encoding using OVERT"
     # encode args 
     encoded_args = [breakdown_and_encode!(model, a, params=params, expr_map=expr_map) for a in args]
