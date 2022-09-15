@@ -234,6 +234,26 @@ function test_overt()
     println("(e_min, e_true, e_max) = ($(e_min), $(e_true), $(e_max))")
 end
 
+function test_overt_complex()
+    # recommend plotting in wolfram alpha to visualize
+    m = Model(with_optimizer(Gurobi.Optimizer, OutputFlag=0))
+    x_ref = @variable(m, x, lower_bound=-10, upper_bound=10.0)
+    e = :(max(sin(x/2), x))
+    con_ref, ovar_ref = add_constraint!(m, e, :o)
+    # then fix the value of x, max and min oa.output and assert that this is an interval capturing the true value
+    model = m;
+    # @constraint(model, x_ref == pi/4)
+    @objective(model, Max, ovar_ref)
+    optimize!(model)
+    e_max = value(ovar_ref)
+    @objective(model, Min, ovar_ref)
+    optimize!(model)
+    e_min = value(ovar_ref)
+    e_true = max(sin(value(x_ref)/2), value(x_ref)) 
+    @assert (e_min <= e_true) && (e_true <= e_max)
+    println("(e_min, e_true, e_max) = ($(e_min), $(e_true), $(e_max))")
+end
+
 function test_max_rewrite()
     # test the re-write of max to relu
     # max(a,b) = 0.5*(a + b + relu(a-b) + relu(b-a))
