@@ -457,7 +457,9 @@ function define_new_arg_ranges(new_args, encoded_args, model, params)
         elseif has_key(model, string(new_arg))
             ranges[new_arg] = [find_bounds(model, encoded_args[i], bound_type=params.bound_type)...]
         end
-    end
+        @debug "ranges_1: " ranges
+    end 
+    @debug "ranges_2: " ranges
     return ranges
 end
 
