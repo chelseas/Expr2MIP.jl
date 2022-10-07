@@ -49,7 +49,7 @@ function find_bounds(model, objective::T where T <: Real, lp_relaxation=true; bo
     When you are passed a real value instead of an expression, just return the real value. 
     """
     @debug("For constant objective $objective, returning $objective as up and low bound")
-    return objective, objective
+    return Float64(objective), Float64(objective)
 end
 
 function find_bounds(model, objective, lp_relaxation=true; bound_type="interval")
