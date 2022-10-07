@@ -459,7 +459,7 @@ function call_overt!(model, f, args; params=EncodingParameters(), expr_map=Dict(
     @debug "Bounds for new args are: " bounds 
     # define new args in model IF NEEDED
     for (i, new_arg) in enumerate(new_args)
-        if !has_key(model, string(new_arg))   # if it doesn't exist in the model yet (Bc it came from an expression) 
+        if !has_key(model, string(new_arg)) && !(typeof(new_arg) <: Real)  # if it doesn't exist in the model yet (Bc it came from an expression) 
             new_arg_ref = @variable(model, base_name=string(new_arg), lower_bound=bounds[i][1], upper_bound=bounds[i][2])
             @debug "New arg ref is " new_arg_ref
             # connect new arg refs to args in the model that they are equivalent to!!!
