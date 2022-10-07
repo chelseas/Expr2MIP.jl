@@ -441,6 +441,24 @@ function replace_arg_in_model(arg::Symbol, lb, ub)
     end
 end
 
+function define_new_arg_ranges(new_args, encoded_args, model, params)
+    # define new args in model IF NEEDED
+    ranges = Dict{Symbol, Vector{Float64}}()
+    for (i, new_arg) in enumerate(new_args)
+        if !has_key(model, string(new_arg)) && !(typeof(new_arg) <: Real)  # if it doesn't exist in the model yet (Bc it came from an expression) 
+            lb, ub = find_bounds(model, encoded_args[i], bound_type=params.bound_type)
+            @debug "bounds for $(encoded_args[i]) = [$lb, $ub]"
+            new_arg_ref = @variable(model, base_name=string(new_arg), lower_bound=lb, upper_bound=ub)
+            @debug "New arg ref is " new_arg_ref
+            # connect new arg refs to args in the model that they are equivalent to!!!
+            @debug "Adding constraint to make $(encoded_args[i]) == $(new_arg_ref)"
+            @constraint(model, encoded_args[i] == new_arg_ref)
+            ranges[new_arg] = [lb,ub]
+        end
+    end
+    return ranges
+end
+
 function call_overt!(model, f, args; params=EncodingParameters(), expr_map=Dict())
     # TODO: deal with situation where you have multiplication by zero. e.g. 
     # TODO: with the translation invariant dimensions, some of the entries of K are zero. when this gets multiplied by other stuff in M(A + BK) then it gets zeroed out. 
@@ -451,25 +469,12 @@ function call_overt!(model, f, args; params=EncodingParameters(), expr_map=Dict(
     @debug "Encoded args are " encoded_args 
     # replace args with new variables IF NEEDED
     new_args = [replace_arg(a) for a in encoded_args]
-    @debug "New args are " new_args 
-    # global NEW_OVERT_VAR_COUNT += length(args) 
+    @debug "New args are " new_args  
+    # reconstruct expression with new args
     expr = Expr(:call, f, new_args...)
-    # find ranges for new args 
-    bounds = [[find_bounds(model, encoded_arg, bound_type=params.bound_type)...] for encoded_arg in encoded_args]
-    @debug "Bounds for new args are: " bounds 
-    # define new args in model IF NEEDED
-    for (i, new_arg) in enumerate(new_args)
-        if !has_key(model, string(new_arg)) && !(typeof(new_arg) <: Real)  # if it doesn't exist in the model yet (Bc it came from an expression) 
-            new_arg_ref = @variable(model, base_name=string(new_arg), lower_bound=bounds[i][1], upper_bound=bounds[i][2])
-            @debug "New arg ref is " new_arg_ref
-            # connect new arg refs to args in the model that they are equivalent to!!!
-            @debug "Adding constraint to make $(encoded_args[i]) == $(new_arg_ref)"
-            @constraint(model, encoded_args[i] == new_arg_ref)
-        end
-    end
-    # construct range_dict
-    range_dict = Dict(zip(new_args, bounds)) 
-    # overapproximate
+    # get ranges for new args and add new args to model
+    range_dict = define_new_arg_ranges(new_args, encoded_args, model, params)
+    # overapproximate expression with new args
     @debug "Overapproximating $expr over domain $(range_dict)"
     oa = overapprox(expr, range_dict::Dict{Symbol, Array{T, 1}} where {T <: Real}, N=params.N, rel_error_tol=params.rel_error_tol)
     @debug "Output variable of overapprox is: $(oa.output) with range $(oa.output_range)"

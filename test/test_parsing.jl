@@ -4,6 +4,8 @@ include("../src/encodings.jl")
 using Test
 using Gurobi
 # ENV["JULIA_DEBUG"] = Main
+optimizer=Gurobi.Optimizer
+model() = Model(with_optimizer(optimizer, OutputFlag=0))
 
 function test_sym_f()
     function test(a::Sym_f{:abs})
@@ -34,7 +36,7 @@ affine_test()
 
 using Gurobi
 function test_convert_affine_to_jump()
-    m = JuMP.Model(Gurobi.Optimizer)
+    m = model()
     e1 = :(3*(x + y) - z)
     @variable(m, base_name="x", lower_bound=0., upper_bound=1.3)
     @variable(m, base_name="y", lower_bound=0., upper_bound=1.3)
@@ -76,7 +78,7 @@ test_convert_step_times_var()
 function testing_encoding()
 
         function f1()
-            m = Model(Gurobi.Optimizer)
+            m = model()
             in_ref = @variable(m, x, lower_bound=-10.2, upper_bound=6.7)
             con_ref, ovar_ref = add_constraint!(m, :(abs(x)), :o)
             print(m)
@@ -88,7 +90,7 @@ function testing_encoding()
         end
 
         function f2()
-            m = Model(Gurobi.Optimizer)
+            m = model()
             in_ref = @variable(m, x, lower_bound=-1.1, upper_bound=1.1)
             con_ref, ovar_ref = add_constraint!(m, :(x + abs(x)), :o)
             print(m)
@@ -99,14 +101,14 @@ function testing_encoding()
         end
 
         function f3()
-            m = Model(Gurobi.Optimizer)
+            m = model()
             in_ref = @variable(m, x, lower_bound=-1.1, upper_bound=1.1)
             add_constraint!(m, :(x + 5*abs(x)), :o)
             print(m)
         end
 
         function f4()
-            m = Model(Gurobi.Optimizer)
+            m = model()
             in_ref = @variable(m, x, lower_bound=-1.1, upper_bound=1.1)
             con_ref, ovar_ref = add_constraint!(m, :(5*x + 5*abs(x)), :o)
             print(m)
@@ -117,7 +119,7 @@ function testing_encoding()
         end
 
         function f5()
-        m = Model(Gurobi.Optimizer)
+        m = model()
         x = @variable(m, x, lower_bound=-1.1, upper_bound=1.1)
         y = @variable(m, y, lower_bound=-1.1, upper_bound=1.1)
         add_constraint!(m, :(abs(x) + abs(y)), :o)
@@ -125,14 +127,14 @@ function testing_encoding()
         end
 
         function f6()
-        m = Model(Gurobi.Optimizer)
+        m = model()
         in_ref = @variable(m, x, lower_bound=-1.1, upper_bound=1.1)
         add_constraint!(m, :(abs(-5 + 10*abs(x))), :o)
         print(m)
         end
 
         function f7()
-        m = Model(Gurobi.Optimizer)
+        m = model()
         x = @variable(m, x, lower_bound=-1.1, upper_bound=1.1)
         y = @variable(m, y, lower_bound=-1.1, upper_bound=1.1)
         add_constraint!(m, :(4*x + 5*y - 62), :o)
@@ -140,7 +142,7 @@ function testing_encoding()
         end
 
         function f8()
-            m = Model(Gurobi.Optimizer)
+            m = model()
             ẑ = @variable(m, ẑ, lower_bound=-6.7, upper_bound=5.6)
             con_ref, ovar_ref = add_constraint!(m, :(unit_step(ẑ)+1), :o)
             print(m)
@@ -151,10 +153,11 @@ function testing_encoding()
         end
 
         function f9()
-            m = Model(Gurobi.Optimizer)
+            m = model()
             ẑ = @variable(m, ẑ, lower_bound=-6.7, upper_bound=5.6)
             x = @variable(m, x, lower_bound=-12.3, upper_bound=0.5)
-            con_ref, ovar_ref = add_constraint!(m, :(unit_step(ẑ)*x), :o, bound_type="interval")
+            params = EncodingParameters()
+            con_ref, ovar_ref = add_constraint!(m, :(unit_step(ẑ)*x), :o, params=params)
             print(m)
             const_ẑ = rand()*12.3 - 6.7
             const_x = rand()*12.8 - 12.3
@@ -165,10 +168,11 @@ function testing_encoding()
         end
 
         function f10()
-            m = Model(Gurobi.Optimizer)
+            m = model()
             x_ref = @variable(m, x, lower_bound=-1, upper_bound=1.0)
             y_ref = @variable(m, y, lower_bound=-1., upper_bound=1.0)
-            con_ref, ovar_ref = add_constraint!(m, :(max(x,y)), :o, bound_type="opt")
+            params = EncodingParameters()
+            con_ref, ovar_ref = add_constraint!(m, :(max(x,y)), :o, params=params)
             print(m)
             const_x = rand()*2 - 1
             const_y = rand()*2 - 1
@@ -179,7 +183,7 @@ function testing_encoding()
         end
 
         function f11()
-            m = Model(Gurobi.Optimizer)
+            m = model()
             x_ref = @variable(m, x, lower_bound=-1, upper_bound=1.0)
             y_ref = @variable(m, y, lower_bound=-1., upper_bound=1.0)
             con_ref, ovar_ref = add_constraint!(m, :(min(x,y)), :o)
@@ -209,7 +213,7 @@ end
 testing_encoding()
 
 function test_symbols()
-    m = Model(Gurobi.Optimizer)
+    m = model()
     x_ref = @variable(m, x, lower_bound=-1, upper_bound=1.0)
     con_ref, ovar_ref = add_constraint!(m, :(pi*(1/180)*x), :o)
     print(m)
