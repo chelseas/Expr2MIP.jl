@@ -454,6 +454,8 @@ function define_new_arg_ranges(new_args, encoded_args, model, params)
             @debug "Adding constraint to make $(encoded_args[i]) == $(new_arg_ref)"
             @constraint(model, encoded_args[i] == new_arg_ref)
             ranges[new_arg] = [lb,ub]
+        elseif has_key(model, string(new_arg))
+            ranges[new_arg] = [find_bounds(model, encoded_args[i], bound_type=params.bound_type)...]
         end
     end
     return ranges
