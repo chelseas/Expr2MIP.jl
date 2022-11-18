@@ -6,9 +6,11 @@ include("types.jl")
 include("encodings.jl")
 include("utilities.jl")
 
+"""
 ########
 # Data Structure to Hold Parameters 
 ########
+"""
 mutable struct EncodingParameters
     bound_type::String 
     rel_error_tol::Float64 # for OVERT calls
@@ -258,14 +260,17 @@ end
 function encode!(model, wrapped_f::Sym_f{:*}, args::Array; params=EncodingParameters(), expr_map=Dict())
     # println("Dealing with multiplication of args: $(args)")
     isnn = .!is_number.(args)
+    consts = Float64.(Basic.(args[.!isnn]))
     if sum(isnn) > 1 # multiplication of two real valued variables is present
         # todo: check we don't have e.g. relu*relu or abs*abs...because I still have to add support to overt for relu*relu
         # also check for unit_step*unit_step and steptimesvar*steptimesvar
         var = call_overt!(model, :*, args[isnn], params=params, expr_map=expr_map) # encodes this arg(s) that contain variables. returns jump var
-        return *(var, args[.!isnn]...) # multiply variable and coefficient together
+        @debug("Called overt for: *$(args[isnn])")
+        @debug("Calling multiplication on $var * prod($consts)")
+        return *(var, consts...) # multiply variable and coefficient together
     else # "outer affine" e.g. const*relu
         encoded_args = [breakdown_and_encode!(model, a, params=params, expr_map=expr_map) for a in args[isnn]]
-        return *(encoded_args..., args[.!isnn]...)
+        return *(encoded_args..., consts...)
     end
 end
 function encode!(model, wrapped_f::Sym_f{:/}, args::Array; params=EncodingParameters(), expr_map=Dict())
