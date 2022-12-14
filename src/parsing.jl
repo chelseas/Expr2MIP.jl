@@ -425,6 +425,7 @@ function encode_overapprox!(model::Model, oa::OverApproximation, domain; params=
         @assert typeof(c.args[3]) == Symbol
         LHS = JuMP.variable_by_name(model, string(c.args[2]))
         RHS = JuMP.variable_by_name(model, string(c.args[3]))
+        println("Adding constraint: $LHS <= $RHS")
         @constraint(model, LHS <= RHS)
     end
     # TODO: use both here and in fuel gage. (don't forget to push to cloud and then pull on jodhpur)
@@ -460,6 +461,7 @@ function define_new_arg_ranges(new_args, encoded_args, model, params)
             @constraint(model, encoded_args[i] == new_arg_ref)
             ranges[new_arg] = [lb,ub]
         elseif has_key(model, string(new_arg))
+            @debug("setting range for $(new_arg)")
             ranges[new_arg] = [find_bounds(model, encoded_args[i], bound_type=params.bound_type)...]
         end
         @debug "ranges_1: " ranges

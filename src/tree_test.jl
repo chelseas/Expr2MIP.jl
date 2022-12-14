@@ -90,13 +90,22 @@ end
 """
 A function to evaluate a sample. 
 """
-function eval_sample(n::OpNode, sample)
+function eval_sample(n::OpNode, sample; mode="custom")
     # evaluate arguments 
     args = [eval_sample(a, sample) for a in n.children]
-    return apply_fun(n.symbol, args)
+    if mode == "custom"
+        return apply_fun(n.symbol, args)
+    elseif mode == "eval"
+        return eval(Expr(:call, n.symbol, args...))
+    elseif mode == "symengine"
+        return Basic(Expr(:call, n.symbol, args...))
+    elseif mode == "getproperty"
+        return getproperty(Base, n.symbol)(args...)
+    end
 end 
 eval_sample(n::VarNode, sample) = sample[n.symbol]
 eval_sample(n::ConstNode, sample) = n.val
+
 
 # testing ~~~~~~~~~~~~~~~ 
 
@@ -111,10 +120,30 @@ x_s, y_s = rand(), rand()
 ## first with normal functions 
 t1 = @elapsed max(min(x_s, y_s), 2.45) 
 ## then evaluating the graph 
-t2 = @elapsed eval_sample(g, Dict(:x => x_s, :y => y_s))
-## compare to running eval 
+t2 = @elapsed eval_sample(g, Dict(:x => x_s, :y => y_s); mode="custom")
+## Compared to running eval in graph
+t2p5 = @elapsed eval_sample(g, Dict(:x => x_s, :y => y_s); mode="eval")
+## compare to running eval natively 
 t3 = @elapsed eval(:(max(eval(:(min(x_s,y_s))),2.45)))
+#  compare to running SymEngine 
+t4 = @elapsed eval_sample(g, Dict(:x => x_s, :y => y_s); mode="symengine")
+# compare to getproperty 
+t5 =@elapsed eval_sample(g, Dict(:x => x_s, :y => y_s); mode="getproperty")
+
+println("t1 native = $t1, \n t2 custom = $t2, \n t2p5 eval in graph = $t2p5, \n t3 eval = $t3, \n t4 symengine = $t4, \n t5 getproperty = $t5")
 #### It's definitely faster than eval (about 6x) but slower than native code (also about 6x)
+# one run: 
+# t1 native = 1.1577e-5, t2 custom = 3.3504e-5, t2p5 eval in graph = 0.000177618, t3 eval = 0.000284704, t4 symengine = 9.8378e-5
+
+# Another run, getproperty is super fast!! :D 
+"""
+t1 native = 1.6258e-5, 
+ t2 custom = 8.0403e-5, 
+ t2p5 eval in graph = 0.000195858, 
+ t3 eval = 0.000318521, 
+ t4 symengine = 0.000109191, 
+ t5 getproperty = 2.9843e-5
+"""
 
 # test encoding into jump
 ## plan: write 

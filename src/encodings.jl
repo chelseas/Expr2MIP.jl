@@ -67,6 +67,7 @@ function encode_max_real!(model, inputs::Array, LBs::Array, UBs::Array)
     new_n = length(inputs)
     @assert new_n >= 1
     #println("new_n = $new_n")
+    @debug("Performing a max over $inputs")
 
     if !need_max # (new_n == 1)
         # there is no need to actually take a max 
