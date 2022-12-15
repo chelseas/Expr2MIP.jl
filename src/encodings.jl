@@ -1,4 +1,5 @@
 using JuMP
+global BILIN_MULT_COUNT=0
 global MAX_COUNT=0
 global ABS_COUNT=0
 global RELU_COUNT=0

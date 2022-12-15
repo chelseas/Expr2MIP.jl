@@ -258,17 +258,33 @@ function encode!(model, wrapped_f::Sym_f{:-}, args::Array; params=EncodingParame
     return -(encoded_args...)
 end
 function encode!(model, wrapped_f::Sym_f{:*}, args::Array; params=EncodingParameters(), expr_map=Dict())
-    # println("Dealing with multiplication of args: $(args)")
+    # Change as of dec 14 -- instead let native gurobi bilinear multiplication handle it.
+    # re-write multiplication to only consist of 2 arguments at a time
     isnn = .!is_number.(args)
     consts = Float64.(Basic.(args[.!isnn]))
-    if sum(isnn) > 1 # multiplication of two real valued variables is present
-        # todo: check we don't have e.g. relu*relu or abs*abs...because I still have to add support to overt for relu*relu
-        # also check for unit_step*unit_step and steptimesvar*steptimesvar
-        var = call_overt!(model, :*, args[isnn], params=params, expr_map=expr_map) # encodes this arg(s) that contain variables. returns jump var
-        @debug("Called overt for: *$(args[isnn])")
-        @debug("Calling multiplication on $var * prod($consts)")
-        return *(var, consts...) # multiply variable and coefficient together
+    @debug "Multiplying " args
+    if sum(isnn) > 1 # recurse 
+        # make sure bilinear multiplication is enabled
+        get_optimizer_attribute(model, "NonConvex") != 2 ? set_optimizer_attribute(model, "NonConvex", 2) : nothing 
+        # recurse on rest of args
+        new_arg2 = breakdown_and_encode!(model, Expr(*(Basic.(args[isnn][2:end])...)); params=params, expr_map=expr_map)
+        # encode arg 1
+        arg1 = breakdown_and_encode!(model,args[isnn][1], params=params, expr_map=expr_map)        
+        # find bounds 
+        l1, u1 = find_bounds(model, arg1, bound_type=params.bound_type)
+        l2, u2 = find_bounds(model, new_arg2, bound_type=params.bound_type)
+        # create new variable to hold output
+        out_s = "bilinear_mult_$BILIN_MULT_COUNT"
+        out = @variable(model, base_name=out_s, lower_bound=min(l1, l2), upper_bound=max(u1, u2))
+        @debug "created new variable called" name(out)
+        global BILIN_MULT_COUNT += 1
+        # encode with bilinear mult
+        @debug "adding constraint $out == $arg1 * $new_arg2"
+        @constraint(model, out==arg1*new_arg2)
+        # return output JuMP variable
+        return *(consts..., out)
     else # "outer affine" e.g. const*relu
+        # encode variable args 
         encoded_args = [breakdown_and_encode!(model, a, params=params, expr_map=expr_map) for a in args[isnn]]
         return *(encoded_args..., consts...)
     end
