@@ -2,6 +2,8 @@ using SymEngine
 using IntervalArithmetic
 using LazySets
 import JuMP.MOI.OPTIMAL, JuMP.MOI.INFEASIBLE
+using Crayons
+using JuMP
 
 function Basic2Expr(e)
     return Meta.parse.(string.(expand.(e)))
@@ -61,9 +63,11 @@ function find_bounds(model, objective, lp_relaxation=true; bound_type="interval"
     end
 end
 
+""" use interval arithmetic to get bounds on objective
+- turn all variables in expression into intervals (using bounds)
+-  objective is an arithemetic expression on VariableRef objects
+"""
 function find_bounds_through_int_arithmetic(model, objective)
-    # use interval arithmetic to get bounds on objective
-    # turn all variables in expression into intervals (using bounds)
     expr = objective
     int_expr = expr.constant # interval 
     #int_expr_lazy = LazySets.Interval(expr.constant, expr.constant)
@@ -118,3 +122,36 @@ function find_bounds_through_opt(model, objective; lp_relaxation=true)
 end
 
 unit_step(ẑ) = (sign(ẑ)+1)/2
+
+function mip_summary(model)
+
+    l_lin, l_bin = count_constraints(model)
+
+    println(Crayon(foreground = :yellow),"="^50)
+    println(Crayon(foreground = :yellow),"="^18 * " mip summary " * "="^19)
+    println(Crayon(foreground = :yellow),"="^50)
+    #println("="^50)
+    println(Crayon(foreground = :yellow), num_variables(model), " total variables, $(l_lin) linear constraints")
+    println(Crayon(foreground = :yellow),"")
+    println(Crayon(foreground = :yellow),num_variables(model), " variables = $l_bin binaries + $(num_variables(model)-l_bin) floats")
+    println(Crayon(foreground = :white),"="^50)
+    print(Crayon(foreground = :black), " ")
+end
+
+function count_constraints(model)
+    const_types = list_of_constraint_types(model)
+    l_lin = 0
+    l_bin = 0
+    for i = 1:length(const_types)
+        var = const_types[i][1]
+        const_type = const_types[i][2]
+        l = num_constraints(model, var, const_type)
+        #println("there are $l constraints of type $const_type with variables type $var.")
+        if const_type != MathOptInterface.ZeroOne
+            l_lin += l
+        else
+            l_bin += l
+        end
+    end
+    return l_lin, l_bin
+end
