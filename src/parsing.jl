@@ -267,15 +267,20 @@ function encode!(model, wrapped_f::Sym_f{:*}, args::Array; params=EncodingParame
         # make sure bilinear multiplication is enabled
         get_optimizer_attribute(model, "NonConvex") != 2 ? set_optimizer_attribute(model, "NonConvex", 2) : nothing 
         # recurse on rest of args
+        @debug "Recursively encoding: " Expr(*(Basic.(args[isnn][2:end])...))
         new_arg2 = breakdown_and_encode!(model, Expr(*(Basic.(args[isnn][2:end])...)); params=params, expr_map=expr_map)
         # encode arg 1
         arg1 = breakdown_and_encode!(model,args[isnn][1], params=params, expr_map=expr_map)        
         # find bounds 
         l1, u1 = find_bounds(model, arg1, bound_type=params.bound_type)
+        i1 = IntervalArithmetic.Interval(l1, u1)
         l2, u2 = find_bounds(model, new_arg2, bound_type=params.bound_type)
+        i2 = IntervalArithmetic.Interval(l2, u2)
+        new_i = i1*i2
+        @debug "Range of bilinear mult is: " new_i
         # create new variable to hold output
         out_s = "bilinear_mult_$BILIN_MULT_COUNT"
-        out = @variable(model, base_name=out_s, lower_bound=min(l1, l2), upper_bound=max(u1, u2))
+        out = @variable(model, base_name=out_s, lower_bound=new_i.lo, upper_bound=new_i.hi)
         @debug "created new variable called" name(out)
         global BILIN_MULT_COUNT += 1
         # encode with bilinear mult
@@ -488,8 +493,8 @@ function call_overt!(model, f, args; params=EncodingParameters(), expr_map=Dict(
     # TODO: deal with situation where you have multiplication by zero. e.g. 
     # TODO: with the translation invariant dimensions, some of the entries of K are zero. when this gets multiplied by other stuff in M(A + BK) then it gets zeroed out. 
     @debug("Encoding $f applied to $args using OVERT! :) ")
-    @debug "Encoding using OVERT"
     # encode args 
+    @debug("First encoding args though...")
     encoded_args = [breakdown_and_encode!(model, a, params=params, expr_map=expr_map) for a in args]
     @debug "Encoded args are " encoded_args 
     # replace args with new variables IF NEEDED
